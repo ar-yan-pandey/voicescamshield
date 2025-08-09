@@ -27,6 +27,7 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const voiceIdRef = useRef<string>("en_US-hfc_female-medium");
   const processingRef = useRef(false);
   const lastTranscriptIdRef = useRef<string | null>(null);
+  const autoKickRef = useRef(false);
 
   // Choose the smallest available instruct model from the prebuilt list for speed
   const modelId = useMemo(() => {
@@ -116,12 +117,13 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
       await tts.download(voiceIdRef.current, () => {});
     } catch {}
     await ensureAudioGraph();
+    autoKickRef.current = false;
     setActive(true);
   }, [active, ensureAudioGraph, ensureEngine]);
-
   const stop = useCallback(async () => {
     setActive(false);
     processingRef.current = false;
+    autoKickRef.current = false;
     if (destRef.current) {
       try { await restoreAudioTrack(); } catch {}
     }
@@ -151,6 +153,16 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
     // Fire and forget
     replyNow();
   }, [active, transcripts, replyNow]);
+
+  // Auto-kick: if agent is active and there's no transcript yet, send a short prompt
+  useEffect(() => {
+    if (!active) return;
+    if (transcripts.length === 0 && !processingRef.current && !autoKickRef.current) {
+      autoKickRef.current = true;
+      // Fire and forget
+      replyNow();
+    }
+  }, [active, transcripts.length, replyNow]);
 
   useEffect(() => {
     return () => {

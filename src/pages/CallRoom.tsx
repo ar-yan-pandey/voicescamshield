@@ -9,6 +9,8 @@ import { toast } from "@/hooks/use-toast";
 import { useWebRTCRoom } from "@/hooks/useWebRTCRoom";
 import { AudioChunker } from "@/utils/AudioChunker";
 import { detectScamLocally, getRiskLevel } from "@/utils/scamDetection";
+import LanguageSelector from "@/components/LanguageSelector";
+import { detectLanguageFromText, DetectedLanguage } from "@/utils/language";
 
 const CallRoom: React.FC = () => {
   const { id } = useParams();
@@ -21,6 +23,10 @@ const CallRoom: React.FC = () => {
   const [riskValue, setRiskValue] = useState(0);
   const [riskLevel, setRiskLevel] = useState<RiskLevel>("low");
   const [aiScamCheckEnabled, setAiScamCheckEnabled] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [camEnabled, setCamEnabled] = useState(true);
+  const [detectedLang, setDetectedLang] = useState<DetectedLanguage | null>(null);
+  const [selectedLang, setSelectedLang] = useState<string | null>(null);
 
   const { connected, presenceCount, role, start, end } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
 
@@ -33,9 +39,41 @@ const CallRoom: React.FC = () => {
     return { value: pct, level: lvl };
   }, []);
 
+  const applyTrackState = () => {
+    const stream = localVideoRef.current?.srcObject as MediaStream | null;
+    if (!stream) return;
+    stream.getAudioTracks().forEach((t) => (t.enabled = micEnabled));
+    stream.getVideoTracks().forEach((t) => (t.enabled = camEnabled));
+  };
+
+  const toggleMic = () => {
+    const stream = localVideoRef.current?.srcObject as MediaStream | null;
+    if (!stream) {
+      toast({ title: "Microphone", description: "No microphone stream found", variant: "destructive" });
+      return;
+    }
+    const next = !micEnabled;
+    setMicEnabled(next);
+    stream.getAudioTracks().forEach((t) => (t.enabled = next));
+    toast({ title: next ? "Mic unmuted" : "Mic muted" });
+  };
+
+  const toggleCam = () => {
+    const stream = localVideoRef.current?.srcObject as MediaStream | null;
+    if (!stream) {
+      toast({ title: "Camera", description: "No camera stream found", variant: "destructive" });
+      return;
+    }
+    const next = !camEnabled;
+    setCamEnabled(next);
+    stream.getVideoTracks().forEach((t) => (t.enabled = next));
+    toast({ title: next ? "Camera On" : "Camera Off" });
+  };
+
   const handleStart = async () => {
     try {
       await start();
+      applyTrackState();
       if (!chunkerRef.current) {
         const chunker = new AudioChunker(async (base64Wav) => {
           try {
@@ -45,19 +83,26 @@ const CallRoom: React.FC = () => {
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  audio: base64Wav, 
-                  analyzeScam: aiScamCheckEnabled 
+                body: JSON.stringify({
+                  audio: base64Wav,
+                  analyzeScam: aiScamCheckEnabled,
+                  language: selectedLang || detectedLang?.code || undefined
                 }),
               }
             );
             const data = await res.json();
             
             if (data?.text) {
+              // Auto-detect language from transcript when not manually set
+              if (!selectedLang) {
+                const det = detectLanguageFromText(data.text);
+                if (det) setDetectedLang(det);
+              }
+
               let riskLabel: RiskLevel;
               let riskScore: number;
               
-              if (aiScamCheckEnabled && data.risk_label && data.risk_score) {
+              if (aiScamCheckEnabled && data.risk_label != null && data.risk_score != null) {
                 // Use AI analysis if enabled and available
                 riskLabel = data.risk_label as RiskLevel;
                 riskScore = data.risk_score;
@@ -160,6 +205,12 @@ const CallRoom: React.FC = () => {
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button onClick={handleStart}>Enable Camera & Connect</Button>
+                    <Button variant={micEnabled ? "secondary" : "destructive"} onClick={toggleMic}>
+                      {micEnabled ? "Mute Mic" : "Unmute Mic"}
+                    </Button>
+                    <Button variant={camEnabled ? "secondary" : "destructive"} onClick={toggleCam}>
+                      {camEnabled ? "Turn Off Camera" : "Turn On Camera"}
+                    </Button>
                     <Button
                       variant="secondary"
                       onClick={() => {
@@ -187,6 +238,22 @@ const CallRoom: React.FC = () => {
         </Card>
 
         <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Language</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                Detected: {detectedLang ? `${detectedLang.name} (${detectedLang.code})` : "Detecting..."}
+              </div>
+              <LanguageSelector
+                detected={detectedLang}
+                selected={selectedLang}
+                onChange={(code) => setSelectedLang(code)}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Live Transcript</CardTitle>

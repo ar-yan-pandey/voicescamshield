@@ -11,7 +11,7 @@ import { AudioChunker } from "@/utils/AudioChunker";
 import { detectScamLocally, getRiskLevel } from "@/utils/scamDetection";
 import LanguageSelector from "@/components/LanguageSelector";
 import { detectLanguageFromText, DetectedLanguage } from "@/utils/language";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
@@ -27,7 +27,9 @@ const CallRoom: React.FC = () => {
   const [camEnabled, setCamEnabled] = useState(true);
   const [detectedLang, setDetectedLang] = useState<DetectedLanguage | null>(null);
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
-
+  const [showScamAlert, setShowScamAlert] = useState(false);
+  const alertShownRef = useRef(false);
+  const pendingTextRef = useRef<string>("");
   const { connected, presenceCount, role, start, end } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
 
   const computeRisk = useCallback((items: TranscriptItem[]) => {
@@ -96,41 +98,56 @@ const CallRoom: React.FC = () => {
             const data = await res.json();
             
             if (data?.text) {
+              const text = String(data.text || '').trim();
               // Auto-detect language from transcript when not manually set
               if (!selectedLang) {
-                const det = detectLanguageFromText(data.text);
+                const det = detectLanguageFromText(text);
                 if (det) setDetectedLang(det);
               }
 
-              let riskLabel: RiskLevel;
-              let riskScore: number;
-              
-              if (aiScamCheckEnabled && data.risk_label != null && data.risk_score != null) {
-                // Use AI analysis if enabled and available
-                riskLabel = data.risk_label as RiskLevel;
-                riskScore = data.risk_score;
-              } else {
-                // Use local scam detection
-                const localAnalysis = detectScamLocally(data.text);
-                riskScore = localAnalysis.score;
-                riskLabel = getRiskLevel(riskScore);
+              const combined = (pendingTextRef.current + ' ' + text).trim();
+              const parts = combined.split(/(?<=[.!?…])\s+/);
+              const endsWithTerminator = /[.!?…]$/.test(combined);
+              const fullSentences = endsWithTerminator ? parts : parts.slice(0, -1);
+              pendingTextRef.current = endsWithTerminator ? '' : (parts[parts.length - 1] || '');
+
+              if (fullSentences.length > 0) {
+                setTranscripts((prev) => {
+                  let next = prev;
+                  for (const s of fullSentences) {
+                    const sentence = s.trim();
+                    if (sentence.length < 4) continue;
+
+                    // Local score for sentence
+                    const local = detectScamLocally(sentence);
+                    let riskScore = local.score;
+
+                    // If AI enabled and has score for this chunk, take max
+                    if (aiScamCheckEnabled && data.risk_score != null) {
+                      riskScore = Math.max(riskScore, Number(data.risk_score));
+                    }
+                    const riskLabel = getRiskLevel(riskScore);
+
+                    const item: TranscriptItem = {
+                      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                      text: sentence,
+                      timestamp: new Date().toLocaleTimeString(),
+                      risk: riskLabel,
+                      score: riskScore,
+                    };
+                    next = [item, ...next].slice(0, 100);
+                  }
+
+                  const { value, level } = computeRisk(next);
+                  setRiskValue(value);
+                  setRiskLevel(level);
+                  if (value >= 50 && !alertShownRef.current) {
+                    alertShownRef.current = true;
+                    setShowScamAlert(true);
+                  }
+                  return next;
+                });
               }
-              
-              const item: TranscriptItem = {
-                id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                text: data.text,
-                timestamp: new Date().toLocaleTimeString(),
-                risk: riskLabel,
-                score: riskScore,
-              };
-              
-              setTranscripts((prev) => {
-                const next = [item, ...prev].slice(0, 100);
-                const { value, level } = computeRisk(next);
-                setRiskValue(value);
-                setRiskLevel(level);
-                return next;
-              });
             }
           } catch (e) {
             console.error("Transcription error", e);

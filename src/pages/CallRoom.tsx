@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import RiskWidget from "@/components/RiskWidget";
 import { toast } from "@/hooks/use-toast";
 import { useWebRTCRoom } from "@/hooks/useWebRTCRoom";
 import { AudioChunker } from "@/utils/AudioChunker";
+import { detectScamLocally, getRiskLevel } from "@/utils/scamDetection";
+
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
@@ -17,19 +20,18 @@ const CallRoom: React.FC = () => {
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [riskValue, setRiskValue] = useState(0);
   const [riskLevel, setRiskLevel] = useState<RiskLevel>("low");
+  const [aiScamCheckEnabled, setAiScamCheckEnabled] = useState(false);
 
   const { connected, presenceCount, role, start, end } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
 
   const computeRisk = useCallback((items: TranscriptItem[]) => {
     if (items.length === 0) return { value: 0, level: "low" as RiskLevel };
     const weights = { low: 0.2, medium: 0.6, high: 0.9 } as const;
-    const v =
-      items.reduce((acc, it) => acc + weights[it.risk], 0) / items.length;
+    const v = items.reduce((acc, it) => acc + weights[it.risk], 0) / items.length;
     const pct = Math.round(v * 100);
     const lvl: RiskLevel = pct >= 70 ? "high" : pct >= 35 ? "medium" : "low";
     return { value: pct, level: lvl };
   }, []);
-
 
   const handleStart = async () => {
     try {
@@ -37,18 +39,35 @@ const CallRoom: React.FC = () => {
       if (!chunkerRef.current) {
         const chunker = new AudioChunker(async (base64Wav) => {
           try {
+            // First, get basic transcription from Gemini
             const res = await fetch(
               "https://qmgjplrejeslnqyoagvu.functions.supabase.co/functions/v1/gemini-transcribe",
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ audio: base64Wav }),
+                body: JSON.stringify({ 
+                  audio: base64Wav, 
+                  analyzeScam: aiScamCheckEnabled 
+                }),
               }
             );
             const data = await res.json();
+            
             if (data?.text) {
-              const riskLabel = (data?.risk_label as RiskLevel) || "low";
-              const riskScore = typeof data?.risk_score === "number" ? data.risk_score : 0.2;
+              let riskLabel: RiskLevel;
+              let riskScore: number;
+              
+              if (aiScamCheckEnabled && data.risk_label && data.risk_score) {
+                // Use AI analysis if enabled and available
+                riskLabel = data.risk_label as RiskLevel;
+                riskScore = data.risk_score;
+              } else {
+                // Use local scam detection
+                const localAnalysis = detectScamLocally(data.text);
+                riskScore = localAnalysis.score;
+                riskLabel = getRiskLevel(riskScore);
+              }
+              
               const item: TranscriptItem = {
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 text: data.text,
@@ -56,6 +75,7 @@ const CallRoom: React.FC = () => {
                 risk: riskLabel,
                 score: riskScore,
               };
+              
               setTranscripts((prev) => {
                 const next = [item, ...prev].slice(0, 100);
                 const { value, level } = computeRisk(next);
@@ -70,7 +90,10 @@ const CallRoom: React.FC = () => {
         }, 3000);
         chunkerRef.current = chunker;
         await chunker.start();
-        toast({ title: "Transcribing", description: "Live transcription started" });
+        toast({ 
+          title: "Transcribing", 
+          description: aiScamCheckEnabled ? "Live transcription with AI scam analysis started" : "Live transcription with local scam detection started" 
+        });
       }
     } catch (e) {
       console.error(e);
@@ -82,6 +105,16 @@ const CallRoom: React.FC = () => {
     chunkerRef.current?.stop();
     chunkerRef.current = null;
     end();
+  };
+
+  const toggleAiScamCheck = () => {
+    setAiScamCheckEnabled(!aiScamCheckEnabled);
+    toast({
+      title: aiScamCheckEnabled ? "AI Scam Check Disabled" : "AI Scam Check Enabled",
+      description: aiScamCheckEnabled 
+        ? "Using local scam detection only" 
+        : "Using AI-enhanced scam analysis"
+    });
   };
 
   useEffect(() => {
@@ -160,6 +193,26 @@ const CallRoom: React.FC = () => {
             </CardHeader>
             <CardContent>
               <TranscriptList items={transcripts} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Scam Detection</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {aiScamCheckEnabled 
+                  ? "Using AI-enhanced scam detection with Gemini" 
+                  : "Using local scam pattern database"}
+              </p>
+              <Button 
+                onClick={toggleAiScamCheck}
+                variant={aiScamCheckEnabled ? "destructive" : "default"}
+                className="w-full"
+              >
+                {aiScamCheckEnabled ? "Disable AI Scam Check" : "Activate Scam AI"}
+              </Button>
             </CardContent>
           </Card>
 

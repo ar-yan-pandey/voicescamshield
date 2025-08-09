@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -14,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audio } = await req.json();
+    const { audio, analyzeScam = false } = await req.json();
     if (!audio) {
       return new Response(JSON.stringify({ error: "Missing 'audio' base64" }), {
         status: 400,
@@ -31,15 +32,18 @@ serve(async (req) => {
       });
     }
 
+    // Determine the prompt based on whether scam analysis is requested
+    const prompt = analyzeScam 
+      ? "Transcribe the audio verbatim in the original language, then assess if it exhibits scam/phishing intent. Return strict JSON: {\n  \"text\": string,\n  \"risk_label\": one of [low, medium, high],\n  \"risk_score\": number between 0 and 1\n}. Do not include any extra text."
+      : "Transcribe the audio verbatim in the original language. Return strict JSON: {\n  \"text\": string\n}. Do not include any extra text.";
+
     const payload = {
       contents: [
         {
           role: "user",
           parts: [
             { inline_data: { mime_type: "audio/wav", data: audio } },
-            {
-              text: "Transcribe the audio verbatim in the original language, then assess if it exhibits scam/phishing intent. Return strict JSON: {\n  \"text\": string,\n  \"risk_label\": one of [low, medium, high],\n  \"risk_score\": number between 0 and 1\n}. Do not include any extra text."
-            }
+            { text: prompt }
           ],
         },
       ],
@@ -67,19 +71,24 @@ serve(async (req) => {
       });
     }
 
+    const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    let result: { text: string; risk_label: string; risk_score: number } = {
+    
+    let result: { text: string; risk_label?: string; risk_score?: number } = {
       text: "",
-      risk_label: "low",
-      risk_score: 0.2,
     };
+
     try {
       const parsed = JSON.parse(raw);
       result = {
         text: typeof parsed.text === "string" ? parsed.text : raw,
-        risk_label: ["low", "medium", "high"].includes(parsed.risk_label) ? parsed.risk_label : "low",
-        risk_score: typeof parsed.risk_score === "number" ? parsed.risk_score : 0.2,
       };
+      
+      // Only include risk analysis if it was requested and provided
+      if (analyzeScam && parsed.risk_label && parsed.risk_score !== undefined) {
+        result.risk_label = ["low", "medium", "high"].includes(parsed.risk_label) ? parsed.risk_label : "low";
+        result.risk_score = typeof parsed.risk_score === "number" ? parsed.risk_score : 0.2;
+      }
     } catch {
       result.text = raw;
     }

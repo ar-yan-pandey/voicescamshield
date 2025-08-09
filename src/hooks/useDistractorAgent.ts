@@ -77,11 +77,11 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const generateReply = useCallback(async (input: string) => {
     const engine = await ensureEngine();
     const system = `You are a stalling assistant. Reply in the same language briefly (6-12 words), polite but evasive, ask for repetition, create harmless delays. Avoid revealing personal info.`;
-    const messages = [
-      { role: "system", content: system },
-      { role: "user", content: `Scammer said: ${input}\nReply (${targetLang || "same language"}), super short.` },
-    ];
-    const out = await engine.chat.completions.create({ messages, temperature: 0.8 });
+    const msgs = [
+      { role: "system" as const, content: system },
+      { role: "user" as const, content: `Scammer said: ${input}\nReply (${targetLang || "same language"}), super short.` },
+    ] as const;
+    const out = await engine.chat.completions.create({ messages: msgs as any, temperature: 0.8 });
     const text = (out.choices?.[0]?.message?.content as string || "").trim().replace(/^"|"$/g, "");
     return text.slice(0, 160);
   }, [ensureEngine, targetLang]);

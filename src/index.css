@@ -53,6 +53,18 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Brand & effects */
+    --brand: 261 83% 62%;
+    --brand-foreground: 0 0% 100%;
+    --brand-glow: 261 83% 72%;
+    --success: 142 70% 45%;
+    --warning: 45 100% 51%;
+    --info: 200 98% 39%;
+    --gradient-primary: linear-gradient(135deg, hsl(var(--brand) / 0.95), hsl(var(--ring) / 0.9));
+    --shadow-elevated: 0 10px 30px -10px hsl(var(--brand) / 0.35);
+    --shadow-glow: 0 0 30px hsl(var(--brand-glow) / 0.5);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -101,5 +113,17 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  .transition-smooth {
+    transition: var(--transition-smooth);
   }
 }

@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import TranscriptList, { TranscriptItem, RiskLevel } from "@/components/TranscriptList";
 import RiskWidget from "@/components/RiskWidget";
 import { toast } from "@/hooks/use-toast";
@@ -15,7 +13,7 @@ const CallRoom: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const chunkerRef = useRef<AudioChunker | null>(null);
-  const [simulate, setSimulate] = useState(true);
+  
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [riskValue, setRiskValue] = useState(0);
   const [riskLevel, setRiskLevel] = useState<RiskLevel>("low");
@@ -32,47 +30,10 @@ const CallRoom: React.FC = () => {
     return { value: pct, level: lvl };
   }, []);
 
-  useEffect(() => {
-    if (!simulate) return;
-    const phrases = [
-      "Hi, I'm from your bank, there's an issue with your account",
-      "We detected unusual activity, please verify your credentials",
-      "You won a prize! Just pay a small fee to claim it",
-      "This is a confirmation of your recent purchase",
-      "Please do not share your OTP with anyone",
-    ];
-    const idBase = Date.now();
-    const t = setInterval(() => {
-      const riskRand = Math.random();
-      const risk: RiskLevel = riskRand > 0.8 ? "high" : riskRand > 0.5 ? "medium" : "low";
-      const score = risk === "high" ? 0.85 + Math.random() * 0.15 : risk === "medium" ? 0.45 + Math.random() * 0.2 : 0.1 + Math.random() * 0.2;
-      const item: TranscriptItem = {
-        id: `${idBase}-${Math.random().toString(36).slice(2)}`,
-        text: phrases[Math.floor(Math.random() * phrases.length)],
-        timestamp: new Date().toLocaleTimeString(),
-        risk,
-        score,
-      };
-      setTranscripts((prev) => {
-        const next = [item, ...prev].slice(0, 100);
-        const { value, level } = computeRisk(next);
-        setRiskValue(value);
-        setRiskLevel(level);
-        if (item.risk === "high") {
-          toast({
-            title: "Potential scam detected",
-            description: "High-risk language or deepfake suspected",
-          });
-        }
-        return next;
-      });
-    }, 2500);
-    return () => clearInterval(t);
-  }, [simulate, computeRisk]);
 
   useEffect(() => {
-    if (simulate) {
-      // Stop real transcription when simulation is on
+    if (!connected) {
+      // Stop transcription when not connected
       chunkerRef.current?.stop();
       chunkerRef.current = null;
       return;
@@ -122,7 +83,7 @@ const CallRoom: React.FC = () => {
       chunkerRef.current?.stop();
       chunkerRef.current = null;
     };
-  }, [simulate, computeRisk]);
+  }, [connected, computeRisk]);
 
   return (
     <main className="min-h-screen container py-8">
@@ -180,11 +141,7 @@ const CallRoom: React.FC = () => {
               </Card>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Switch id="simulate" checked={simulate} onCheckedChange={setSimulate} />
-                <Label htmlFor="simulate">Simulate analysis</Label>
-              </div>
+            <div className="mt-4 flex justify-end">
               <Button variant="destructive" onClick={end}>End</Button>
             </div>
           </CardContent>

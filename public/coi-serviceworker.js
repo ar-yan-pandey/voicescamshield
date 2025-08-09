@@ -27,11 +27,39 @@ if (typeof window === 'undefined') {
             return;
         }
 
-        const request = (coepCredentialless && r.mode === "no-cors")
-            ? new Request(r, {
-                credentials: "omit",
-            })
-            : r;
+        // Map blocked ONNXRuntime CDN URLs to our self-hosted copies under /ort/
+        const mapOrtUrl = (url) => {
+            try {
+                const u = new URL(url);
+                const redirectUrl = u.searchParams.get("redirect_url");
+                if (redirectUrl) {
+                    // Handle Cloudflare Access fallback URL wrapping the real cdnjs path
+                    return mapOrtUrl("https://dummy/" + redirectUrl);
+                }
+            } catch {}
+
+            const mappings = [
+                { re: /ort-wasm-simd-threaded\.jsep\.mjs/i, local: "/ort/ort-wasm-simd-threaded.jsep.mjs" },
+                { re: /ort-wasm-simd-threaded\.worker\.js/i, local: "/ort/ort-wasm-simd-threaded.worker.js" },
+                { re: /ort-wasm-simd\.jsep\.mjs/i, local: "/ort/ort-wasm-simd.jsep.mjs" },
+                { re: /ort-wasm-simd\.worker\.js/i, local: "/ort/ort-wasm-simd.worker.js" },
+                { re: /ort-wasm-simd\.wasm/i, local: "/ort/ort-wasm-simd.wasm" },
+            ];
+
+            for (const m of mappings) {
+                if (m.re.test(url) && /onnxruntime-web|speedcdnjs|cloudflare/i.test(url)) {
+                    return m.local;
+                }
+            }
+            return null;
+        };
+
+        const localOrt = mapOrtUrl(r.url);
+        const request = localOrt ? new Request(localOrt, { method: "GET" })
+            : ((coepCredentialless && r.mode === "no-cors")
+                ? new Request(r, { credentials: "omit" })
+                : r);
+
         event.respondWith(
             fetch(request)
                 .then((response) => {

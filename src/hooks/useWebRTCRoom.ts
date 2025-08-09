@@ -30,6 +30,8 @@ export const useWebRTCRoom = (
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescSet = useRef(false);
+  const originalAudioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const injectedAudioTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const cleanupMedia = () => {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -83,6 +85,28 @@ export const useWebRTCRoom = (
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     return stream;
   }, [localVideoRef]);
+
+  const replaceAudioTrack = useCallback(async (newTrack: MediaStreamTrack) => {
+    const pc = ensurePC();
+    const sender = pc.getSenders().find((s) => s.track && s.track.kind === "audio");
+    if (!sender) return;
+    if (!originalAudioTrackRef.current) {
+      originalAudioTrackRef.current = sender.track ?? null;
+    }
+    await sender.replaceTrack(newTrack);
+    injectedAudioTrackRef.current = newTrack;
+  }, [ensurePC]);
+
+  const restoreAudioTrack = useCallback(async () => {
+    const pc = pcRef.current;
+    if (!pc) return;
+    const sender = pc.getSenders().find((s) => s.track && s.track.kind === "audio");
+    if (!sender) return;
+    if (originalAudioTrackRef.current) {
+      await sender.replaceTrack(originalAudioTrackRef.current);
+    }
+    injectedAudioTrackRef.current = null;
+  }, []);
 
   const handleBroadcast = useCallback(
     async (raw: any) => {
@@ -220,5 +244,5 @@ export const useWebRTCRoom = (
     };
   }, [end]);
 
-  return { connected, presenceCount, role, start, end } as const;
+  return { connected, presenceCount, role, start, end, replaceAudioTrack, restoreAudioTrack } as const;
 };

@@ -8,14 +8,13 @@ import TranscriptList, { TranscriptItem, RiskLevel } from "@/components/Transcri
 import RiskWidget from "@/components/RiskWidget";
 import { toast } from "@/hooks/use-toast";
 import { useWebRTCRoom } from "@/hooks/useWebRTCRoom";
-
+import { AudioChunker } from "@/utils/AudioChunker";
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-
-
+  const chunkerRef = useRef<AudioChunker | null>(null);
   const [simulate, setSimulate] = useState(true);
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [riskValue, setRiskValue] = useState(0);
@@ -71,13 +70,59 @@ const CallRoom: React.FC = () => {
     return () => clearInterval(t);
   }, [simulate, computeRisk]);
 
+  useEffect(() => {
+    if (simulate) {
+      // Stop real transcription when simulation is on
+      chunkerRef.current?.stop();
+      chunkerRef.current = null;
+      return;
+    }
 
+    const chunker = new AudioChunker(async (base64Wav) => {
+      try {
+        const res = await fetch(
+          "https://qmgjplrejeslnqyoagvu.functions.supabase.co/functions/v1/gemini-transcribe",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio: base64Wav }),
+          }
+        );
+        const data = await res.json();
+        if (data?.text) {
+          const item: TranscriptItem = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString(),
+            risk: "low",
+            score: 0.2,
+          };
+          setTranscripts((prev) => {
+            const next = [item, ...prev].slice(0, 100);
+            const { value, level } = computeRisk(next);
+            setRiskValue(value);
+            setRiskLevel(level);
+            return next;
+          });
+        }
+      } catch (e) {
+        console.error("Transcription error", e);
+      }
+    }, 3000);
 
+    chunkerRef.current = chunker;
+    chunker
+      .start()
+      .catch((e) => {
+        console.error(e);
+        toast({ title: "Microphone error", description: "Failed to access mic", variant: "destructive" });
+      });
 
-
-
-
-
+    return () => {
+      chunkerRef.current?.stop();
+      chunkerRef.current = null;
+    };
+  }, [simulate, computeRisk]);
 
   return (
     <main className="min-h-screen container py-8">
@@ -138,7 +183,7 @@ const CallRoom: React.FC = () => {
             <div className="mt-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Switch id="simulate" checked={simulate} onCheckedChange={setSimulate} />
-                <Label htmlFor="simulate">Simulate analysis (until Supabase is connected)</Label>
+                <Label htmlFor="simulate">Simulate analysis</Label>
               </div>
               <Button variant="destructive" onClick={end}>End</Button>
             </div>

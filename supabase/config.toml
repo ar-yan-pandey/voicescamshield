@@ -1,1 +1,4 @@
 project_id = "qmgjplrejeslnqyoagvu"
+
+[functions.gemini-transcribe]
+verify_jwt = false

@@ -28,6 +28,8 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const voiceIdRef = useRef<string>("en_US-hfc_female-medium");
   const processingRef = useRef(false);
   const lastTranscriptIdRef = useRef<string | null>(null);
+  const autoKickRef = useRef(false);
+  const lastReplyRef = useRef<string>("");
 
   // Ensure ONNXRuntime loads from our self-hosted path to avoid CORS
   useEffect(() => {
@@ -37,7 +39,6 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
     } catch {}
   }, []);
 
-  const autoKickRef = useRef(false);
 
   // Choose the smallest available instruct model from the prebuilt list for speed
   const modelId = useMemo(() => {
@@ -95,13 +96,32 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   }, [ensureAudioGraph]);
 
   const generateReply = useCallback(async (input: string) => {
+    const prev = (lastReplyRef.current || "").trim();
+    const wantsFiller = !input || input.trim().length < 3;
+    const rnd = Math.random().toString(36).slice(2, 7);
+
     // Try fast online generation via Supabase Edge Function (Gemini)
     try {
       const { data, error } = await supabase.functions.invoke("agent-reply", {
-        body: { text: input, targetLang: targetLang || null },
+        body: {
+          text: wantsFiller ? `NO_TRANSCRIPT_${rnd}` : input,
+          targetLang: targetLang || null,
+        },
       });
       if (!error && (data as any)?.reply) {
-        return String((data as any).reply).trim().slice(0, 160);
+        let reply = String((data as any).reply).trim();
+        if (prev && reply.toLowerCase() === prev.toLowerCase()) {
+          const variants = [
+            "The line’s a bit fuzzy—one second, please.",
+            "Give me a moment, the audio’s cutting out.",
+            "Sorry, slight echo here—could you hold a second?",
+            "Let me adjust my headset—just a moment, please.",
+            "I’m catching interference—can you repeat in a second?",
+          ];
+          reply = variants[Math.floor(Math.random() * variants.length)];
+        }
+        lastReplyRef.current = reply;
+        return reply.slice(0, 160);
       }
     } catch (e) {
       console.warn("agent-reply online failed; falling back to local LLM", e);
@@ -109,13 +129,27 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
 
     // Fallback to local WebLLM engine
     const engine = await ensureEngine();
-    const system = `You are a stalling assistant. Reply in the same language briefly (6-12 words), polite but evasive, ask for repetition, create harmless delays. Avoid revealing personal info.`;
+    const system = `You are a stalling assistant. Reply in the same language briefly (6-12 words). Be polite but evasive. Vary your wording each time and avoid repeating the last reply exactly: \"${prev}\". Prefer gentle delays: asking to repeat, saying connection is choppy, needing a moment, confirming details. Avoid personal info.`;
+    const userContent = wantsFiller
+      ? `No transcript provided. Produce a short varied stalling line (${targetLang || "same language"}).`
+      : `Scammer said: ${input}\nReply (${targetLang || "same language"}), super short.`;
     const msgs = [
       { role: "system" as const, content: system },
-      { role: "user" as const, content: `Scammer said: ${input}\nReply (${targetLang || "same language"}), super short.` },
+      { role: "user" as const, content: userContent },
     ] as const;
-    const out = await engine.chat.completions.create({ messages: msgs as any, temperature: 0.8 });
-    const text = (out.choices?.[0]?.message?.content as string || "").trim().replace(/^"|"$/g, "");
+    const out = await engine.chat.completions.create({ messages: msgs as any, temperature: 0.9 });
+    let text = (out.choices?.[0]?.message?.content as string || "").trim().replace(/^"|"$/g, "");
+    if (prev && text.toLowerCase() === prev.toLowerCase()) {
+      const variants = [
+        "Let me double-check that—one moment, please.",
+        "I’m hearing a bit of static—could you hold a second?",
+        "Sorry, slight delay here—could you repeat briefly?",
+        "Give me just a moment to catch that clearly.",
+        "The connection dipped—can you say that once more?",
+      ];
+      text = variants[Math.floor(Math.random() * variants.length)];
+    }
+    lastReplyRef.current = text;
     return text.slice(0, 160);
   }, [ensureEngine, targetLang]);
 
@@ -142,10 +176,13 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const replyNow = useCallback(async () => {
     if (!active || processingRef.current) return;
     const last = transcripts[0];
-    const input = last?.text || "Can you repeat that?";
+    const hasTranscript = !!last?.text && last.text.trim().length > 0;
+    const input = hasTranscript ? last!.text : ""; // no fake scammer message
     processingRef.current = true;
     try {
-      setMessages((m) => [{ id: crypto.randomUUID(), who: "scammer", text: input, ts: Date.now() }, ...m]);
+      if (hasTranscript) {
+        setMessages((m) => [{ id: crypto.randomUUID(), who: "scammer", text: input, ts: Date.now() }, ...m]);
+      }
       const reply = await generateReply(input);
       setMessages((m) => [{ id: crypto.randomUUID(), who: "agent", text: reply, ts: Date.now() }, ...m]);
       await speak(reply);

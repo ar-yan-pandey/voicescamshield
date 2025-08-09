@@ -82,16 +82,25 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
 
   const speak = useCallback(async (text: string) => {
     const { ctx, dest } = await ensureAudioGraph();
+    try { await ctx.resume(); } catch {}
     // Generate WAV blob via Piper
     const wavBlob = await tts.predict({ text, voiceId: voiceIdRef.current });
     const arrBuf = await wavBlob.arrayBuffer();
     const audioBuf = await ctx.decodeAudioData(arrBuf);
     const src = ctx.createBufferSource();
     src.buffer = audioBuf;
-    src.connect(dest);
+    const gain = ctx.createGain();
+    gain.gain.value = 1.2; // slightly boost loudness
+    src.connect(gain);
+    // Send to remote (WebRTC) and also monitor locally
+    gain.connect(dest);
+    try { gain.connect(ctx.destination); } catch {}
     src.start();
     return new Promise<void>((resolve) => {
-      src.onended = () => resolve();
+      src.onended = () => {
+        try { src.disconnect(); gain.disconnect(); } catch {}
+        resolve();
+      };
     });
   }, [ensureAudioGraph]);
 

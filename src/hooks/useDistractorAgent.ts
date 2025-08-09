@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreateMLCEngine, type MLCEngineInterface, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import * as tts from "@mintplex-labs/piper-tts-web";
+import * as ort from "onnxruntime-web";
 import { supabase } from "../integrations/supabase/client";
 
 export interface AgentMessage {
@@ -27,6 +28,15 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const voiceIdRef = useRef<string>("en_US-hfc_female-medium");
   const processingRef = useRef(false);
   const lastTranscriptIdRef = useRef<string | null>(null);
+
+  // Ensure ONNXRuntime loads from our self-hosted path to avoid CORS
+  useEffect(() => {
+    try {
+      (ort as any).env.wasm.wasmPaths = "/ort/";
+      (ort as any).env.wasm.numThreads = 1; // force non-threaded to use smaller wasm
+    } catch {}
+  }, []);
+
   const autoKickRef = useRef(false);
 
   // Choose the smallest available instruct model from the prebuilt list for speed

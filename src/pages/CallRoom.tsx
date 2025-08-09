@@ -12,6 +12,7 @@ import { detectScamLocally, getRiskLevel } from "@/utils/scamDetection";
 import LanguageSelector from "@/components/LanguageSelector";
 import { detectLanguageFromText, DetectedLanguage } from "@/utils/language";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useDistractorAgent } from "@/hooks/useDistractorAgent";
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
@@ -30,7 +31,8 @@ const CallRoom: React.FC = () => {
   const [showScamAlert, setShowScamAlert] = useState(false);
   const alertShownRef = useRef(false);
   const pendingTextRef = useRef<string>("");
-  const { connected, presenceCount, role, start, end } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
+  const { connected, presenceCount, role, start, end, replaceAudioTrack, restoreAudioTrack } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
+  const agent = useDistractorAgent({ transcripts, replaceAudioTrack, restoreAudioTrack, targetLang: selectedLang });
 
   const computeRisk = useCallback((items: TranscriptItem[]) => {
     if (items.length === 0) return { value: 0, level: "low" as RiskLevel };
@@ -167,6 +169,7 @@ const CallRoom: React.FC = () => {
   };
 
   const handleEnd = () => {
+    try { agent.stop(); } catch {}
     chunkerRef.current?.stop();
     chunkerRef.current = null;
     end();
@@ -308,8 +311,33 @@ const CallRoom: React.FC = () => {
               <CardTitle>Distractor Agent</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">Trigger a voice bot from your side to safely disengage. Requires backend integration.</p>
-              <Button onClick={() => toast({ title: "Agent requested", description: "Will activate once backend is connected" })}>Trigger Agent</Button>
+              <div className="flex gap-2">
+                {!agent.active ? (
+                  <Button onClick={agent.start} className="w-full">Start Distracting Agent</Button>
+                ) : (
+                  <>
+                    <Button variant="destructive" onClick={agent.stop}>Stop Agent</Button>
+                    <Button variant="secondary" onClick={agent.replyNow}>Speak Now</Button>
+                  </>
+                )}
+              </div>
+              <div className="max-h-60 overflow-y-auto rounded-md border bg-card/50 p-2">
+                {agent.messages.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No agent activity yet.</div>
+                ) : (
+                  <ul className="space-y-2">
+                    {agent.messages.map((m) => (
+                      <li key={m.id} className="text-sm">
+                        <span className={m.who === 'agent' ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                          {m.who === 'agent' ? 'Agent' : 'Scammer'}:
+                        </span>
+                        <span className="ml-2">{m.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Fully local LLM+TTS. Replaces your mic while speaking.</p>
             </CardContent>
           </Card>
         </div>
@@ -324,11 +352,11 @@ const CallRoom: React.FC = () => {
           {aiScamCheckEnabled ? "Disable Scam AI" : "Activate Scam AI"}
         </Button>
         <Button 
-          variant="secondary"
-          onClick={() => toast({ title: "Agent requested", description: "Will activate once backend is connected" })}
-          aria-label="Activate Distracting Agent"
+          variant={agent.active ? "destructive" : "secondary"}
+          onClick={() => (agent.active ? agent.stop() : agent.start())}
+          aria-label="Toggle Distracting Agent"
         >
-          Distracting Agent
+          {agent.active ? "Stop Agent" : "Distracting Agent"}
         </Button>
       </div>
 

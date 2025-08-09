@@ -337,7 +337,7 @@ const CallRoom: React.FC = () => {
                   </ul>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Fully local LLM+TTS. Replaces your mic while speaking.</p>
+              <p className="text-xs text-muted-foreground">Online (Gemini via Supabase) when available; falls back to local LLM+TTS. Replaces your mic while speaking.</p>
             </CardContent>
           </Card>
         </div>

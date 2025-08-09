@@ -135,7 +135,7 @@ const CallRoom: React.FC = () => {
           } catch (e) {
             console.error("Transcription error", e);
           }
-        }, 1000);
+        }, 1000, { vadEnabled: true, vadThreshold: 0.02, vadHangoverMs: 500 });
         chunkerRef.current = chunker;
         await chunker.start();
         toast({ 
@@ -296,6 +296,23 @@ const CallRoom: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        <Button 
+          onClick={toggleAiScamCheck}
+          variant={aiScamCheckEnabled ? "destructive" : "default"}
+          aria-label={aiScamCheckEnabled ? "Disable Scam AI" : "Activate Scam AI"}
+        >
+          {aiScamCheckEnabled ? "Disable Scam AI" : "Activate Scam AI"}
+        </Button>
+        <Button 
+          variant="secondary"
+          onClick={() => toast({ title: "Agent requested", description: "Will activate once backend is connected" })}
+          aria-label="Activate Distracting Agent"
+        >
+          Distracting Agent
+        </Button>
       </div>
 
       <RiskWidget value={riskValue} level={riskLevel} />

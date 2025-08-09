@@ -1,3 +1,9 @@
+export type AudioChunkerOptions = {
+  vadEnabled?: boolean;
+  vadThreshold?: number; // energy threshold (RMS) ~0.01-0.03 typical
+  vadHangoverMs?: number; // keep recording this long after voice dips below threshold
+};
+
 export class AudioChunker {
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
@@ -6,8 +12,17 @@ export class AudioChunker {
   private buffer: Float32Array[] = [];
   private flushTimer: number | null = null;
   private paused = false;
+  private opts: AudioChunkerOptions = { vadEnabled: true, vadThreshold: 0.015, vadHangoverMs: 400 };
+  private vadPaused = false;
+  private lastVoice = 0;
 
-  constructor(private onChunk: (base64Wav: string) => void | Promise<void>, private chunkMs = 3000) {}
+  constructor(
+    private onChunk: (base64Wav: string) => void | Promise<void>,
+    private chunkMs = 3000,
+    opts: AudioChunkerOptions = {}
+  ) {
+    this.opts = { ...this.opts, ...opts };
+  }
 
   async start() {
     // 24kHz mono input
@@ -26,8 +41,21 @@ export class AudioChunker {
     this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
     this.processor.onaudioprocess = (e) => {
-      if (this.paused) return;
       const input = e.inputBuffer.getChannelData(0);
+
+      if (this.opts.vadEnabled) {
+        const rms = this.computeRMS(input);
+        const now = performance.now();
+        if (rms >= (this.opts.vadThreshold ?? 0.015)) {
+          this.lastVoice = now;
+          this.vadPaused = false;
+        } else {
+          const delta = now - this.lastVoice;
+          this.vadPaused = delta > (this.opts.vadHangoverMs ?? 400);
+        }
+      }
+
+      if (this.isPaused()) return;
       this.buffer.push(new Float32Array(input));
     };
     this.source.connect(this.processor);
@@ -58,6 +86,8 @@ export class AudioChunker {
       this.audioContext = null;
     }
     this.buffer = [];
+    this.vadPaused = false;
+    this.lastVoice = 0;
   }
 
   setPaused(paused: boolean) {
@@ -65,8 +95,21 @@ export class AudioChunker {
     if (paused) this.buffer = [];
   }
 
+  private isPaused() {
+    return this.paused || (this.opts.vadEnabled ? this.vadPaused : false);
+  }
+
+  private computeRMS(frame: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < frame.length; i++) {
+      const s = frame[i];
+      sum += s * s;
+    }
+    return Math.sqrt(sum / frame.length);
+  }
+
   private flush() {
-    if (this.paused || this.buffer.length === 0) return;
+    if (this.isPaused() || this.buffer.length === 0) return;
     // Concatenate Float32
     const length = this.buffer.reduce((acc, b) => acc + b.length, 0);
     const combined = new Float32Array(length);

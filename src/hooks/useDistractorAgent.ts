@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreateMLCEngine, type MLCEngineInterface, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import * as tts from "@mintplex-labs/piper-tts-web";
+import { supabase } from "../integrations/supabase/client";
 
 export interface AgentMessage {
   id: string;
@@ -83,6 +84,19 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   }, [ensureAudioGraph]);
 
   const generateReply = useCallback(async (input: string) => {
+    // Try fast online generation via Supabase Edge Function (Gemini)
+    try {
+      const { data, error } = await supabase.functions.invoke("agent-reply", {
+        body: { text: input, targetLang: targetLang || null },
+      });
+      if (!error && (data as any)?.reply) {
+        return String((data as any).reply).trim().slice(0, 160);
+      }
+    } catch (e) {
+      console.warn("agent-reply online failed; falling back to local LLM", e);
+    }
+
+    // Fallback to local WebLLM engine
     const engine = await ensureEngine();
     const system = `You are a stalling assistant. Reply in the same language briefly (6-12 words), polite but evasive, ask for repetition, create harmless delays. Avoid revealing personal info.`;
     const msgs = [

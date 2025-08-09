@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreateMLCEngine, type MLCEngineInterface } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, type MLCEngineInterface, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import * as tts from "@mintplex-labs/piper-tts-web";
 
 export interface AgentMessage {
@@ -27,8 +27,16 @@ export const useDistractorAgent = ({ transcripts, replaceAudioTrack, restoreAudi
   const processingRef = useRef(false);
   const lastTranscriptIdRef = useRef<string | null>(null);
 
-  // Small, fast model id known to work in WebLLM prebuilt set. Users can change later.
-  const modelId = useMemo(() => "Phi-2-q4f16_1-MLC", []);
+  // Choose the smallest available instruct model from the prebuilt list for speed
+  const modelId = useMemo(() => {
+    const list: Array<{ model_id: string }> = (prebuiltAppConfig as any)?.model_list ?? [];
+    if (!list.length) return "Llama-3.1-8B-Instruct-q4f32_1-MLC";
+    const rank = (id: string) =>
+      id.includes("1.5B") ? 1 : id.includes("2B") ? 2 : id.includes("3B") ? 3 : id.includes("4B") ? 4 : id.includes("7B") ? 7 : id.includes("8B") ? 8 : 99;
+    const candidates = list.filter((m) => /Instruct/i.test(m.model_id));
+    const pick = (candidates.length ? candidates : list).sort((a, b) => rank(a.model_id) - rank(b.model_id))[0];
+    return pick?.model_id ?? "Llama-3.1-8B-Instruct-q4f32_1-MLC";
+  }, []);
 
   const ensureEngine = useCallback(async () => {
     if (engineRef.current) return engineRef.current;

@@ -31,59 +31,65 @@ const CallRoom: React.FC = () => {
   }, []);
 
 
-  useEffect(() => {
-    if (!connected) {
-      // Stop transcription when not connected
-      chunkerRef.current?.stop();
-      chunkerRef.current = null;
-      return;
-    }
-
-    const chunker = new AudioChunker(async (base64Wav) => {
-      try {
-        const res = await fetch(
-          "https://qmgjplrejeslnqyoagvu.functions.supabase.co/functions/v1/gemini-transcribe",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ audio: base64Wav }),
+  const handleStart = async () => {
+    try {
+      await start();
+      if (!chunkerRef.current) {
+        const chunker = new AudioChunker(async (base64Wav) => {
+          try {
+            const res = await fetch(
+              "https://qmgjplrejeslnqyoagvu.functions.supabase.co/functions/v1/gemini-transcribe",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ audio: base64Wav }),
+              }
+            );
+            const data = await res.json();
+            if (data?.text) {
+              const riskLabel = (data?.risk_label as RiskLevel) || "low";
+              const riskScore = typeof data?.risk_score === "number" ? data.risk_score : 0.2;
+              const item: TranscriptItem = {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                text: data.text,
+                timestamp: new Date().toLocaleTimeString(),
+                risk: riskLabel,
+                score: riskScore,
+              };
+              setTranscripts((prev) => {
+                const next = [item, ...prev].slice(0, 100);
+                const { value, level } = computeRisk(next);
+                setRiskValue(value);
+                setRiskLevel(level);
+                return next;
+              });
+            }
+          } catch (e) {
+            console.error("Transcription error", e);
           }
-        );
-        const data = await res.json();
-        if (data?.text) {
-          const item: TranscriptItem = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            text: data.text,
-            timestamp: new Date().toLocaleTimeString(),
-            risk: "low",
-            score: 0.2,
-          };
-          setTranscripts((prev) => {
-            const next = [item, ...prev].slice(0, 100);
-            const { value, level } = computeRisk(next);
-            setRiskValue(value);
-            setRiskLevel(level);
-            return next;
-          });
-        }
-      } catch (e) {
-        console.error("Transcription error", e);
+        }, 3000);
+        chunkerRef.current = chunker;
+        await chunker.start();
+        toast({ title: "Transcribing", description: "Live transcription started" });
       }
-    }, 3000);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Failed to start", variant: "destructive" });
+    }
+  };
 
-    chunkerRef.current = chunker;
-    chunker
-      .start()
-      .catch((e) => {
-        console.error(e);
-        toast({ title: "Microphone error", description: "Failed to access mic", variant: "destructive" });
-      });
+  const handleEnd = () => {
+    chunkerRef.current?.stop();
+    chunkerRef.current = null;
+    end();
+  };
 
+  useEffect(() => {
     return () => {
       chunkerRef.current?.stop();
       chunkerRef.current = null;
     };
-  }, [connected, computeRisk]);
+  }, []);
 
   return (
     <main className="min-h-screen container py-8">
@@ -101,7 +107,7 @@ const CallRoom: React.FC = () => {
                 <video ref={localVideoRef} autoPlay playsInline muted className="w-full aspect-video bg-muted" />
                 <div className="p-3 flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">Local</div>
-                  <Button variant="secondary" onClick={start}>Enable Camera & Connect</Button>
+                  <Button variant="secondary" onClick={handleStart}>Enable Camera & Connect</Button>
                 </div>
               </div>
               <div className="rounded-lg overflow-hidden border bg-card">
@@ -120,7 +126,7 @@ const CallRoom: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={start}>Enable Camera & Connect</Button>
+                    <Button onClick={handleStart}>Enable Camera & Connect</Button>
                     <Button
                       variant="secondary"
                       onClick={() => {
@@ -132,7 +138,7 @@ const CallRoom: React.FC = () => {
                     >
                       Copy Call Link
                     </Button>
-                    <Button variant="destructive" onClick={end}>End Call</Button>
+                    <Button variant="destructive" onClick={handleEnd}>End Call</Button>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Status: {connected ? "Connected" : "Waiting..."} • Participants: {presenceCount} {role ? `• You are ${role}` : ""}
@@ -142,7 +148,7 @@ const CallRoom: React.FC = () => {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <Button variant="destructive" onClick={end}>End</Button>
+              <Button variant="destructive" onClick={handleEnd}>End</Button>
             </div>
           </CardContent>
         </Card>

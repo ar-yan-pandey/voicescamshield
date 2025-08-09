@@ -38,14 +38,14 @@ serve(async (req) => {
           parts: [
             { inline_data: { mime_type: "audio/wav", data: audio } },
             {
-              text:
-                "Transcribe the audio verbatim in the original language. Return only the transcript text without any additional commentary.",
-            },
+              text: "Transcribe the audio verbatim in the original language, then assess if it exhibits scam/phishing intent. Return strict JSON: {\n  \"text\": string,\n  \"risk_label\": one of [low, medium, high],\n  \"risk_score\": number between 0 and 1\n}. Do not include any extra text."
+            }
           ],
         },
       ],
       generationConfig: {
         temperature: 0.2,
+        response_mime_type: "application/json"
       },
     };
 
@@ -67,10 +67,24 @@ serve(async (req) => {
       });
     }
 
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    let result: { text: string; risk_label: string; risk_score: number } = {
+      text: "",
+      risk_label: "low",
+      risk_score: 0.2,
+    };
+    try {
+      const parsed = JSON.parse(raw);
+      result = {
+        text: typeof parsed.text === "string" ? parsed.text : raw,
+        risk_label: ["low", "medium", "high"].includes(parsed.risk_label) ? parsed.risk_label : "low",
+        risk_score: typeof parsed.risk_score === "number" ? parsed.risk_score : 0.2,
+      };
+    } catch {
+      result.text = raw;
+    }
 
-    return new Response(JSON.stringify({ text }), {
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

@@ -39,41 +39,44 @@ const CallRoom: React.FC = () => {
     return { value: pct, level: lvl };
   }, []);
 
-  const applyTrackState = () => {
-    const stream = localVideoRef.current?.srcObject as MediaStream | null;
-    if (!stream) return;
-    stream.getAudioTracks().forEach((t) => (t.enabled = micEnabled));
-    stream.getVideoTracks().forEach((t) => (t.enabled = camEnabled));
-  };
-
   const toggleMic = () => {
     const stream = localVideoRef.current?.srcObject as MediaStream | null;
-    if (!stream) {
-      toast({ title: "Microphone", description: "No microphone stream found", variant: "destructive" });
-      return;
-    }
     const next = !micEnabled;
     setMicEnabled(next);
-    stream.getAudioTracks().forEach((t) => (t.enabled = next));
+
+    if (stream) {
+      stream.getAudioTracks().forEach((t) => (t.enabled = next));
+    }
+
+    // Pause/resume transcription when mic is muted/unmuted
+    if (chunkerRef.current) {
+      chunkerRef.current.setPaused(!next);
+    }
+
     toast({ title: next ? "Mic unmuted" : "Mic muted" });
   };
 
   const toggleCam = () => {
     const stream = localVideoRef.current?.srcObject as MediaStream | null;
-    if (!stream) {
-      toast({ title: "Camera", description: "No camera stream found", variant: "destructive" });
-      return;
-    }
     const next = !camEnabled;
     setCamEnabled(next);
-    stream.getVideoTracks().forEach((t) => (t.enabled = next));
+
+    if (stream) {
+      stream.getVideoTracks().forEach((t) => (t.enabled = next));
+    }
+
     toast({ title: next ? "Camera On" : "Camera Off" });
   };
 
   const handleStart = async () => {
     try {
       await start();
-      applyTrackState();
+      // apply current mic/camera state to local stream
+      const stream = localVideoRef.current?.srcObject as MediaStream | null;
+      if (stream) {
+        stream.getAudioTracks().forEach((t) => (t.enabled = micEnabled));
+        stream.getVideoTracks().forEach((t) => (t.enabled = camEnabled));
+      }
       if (!chunkerRef.current) {
         const chunker = new AudioChunker(async (base64Wav) => {
           try {
@@ -132,7 +135,7 @@ const CallRoom: React.FC = () => {
           } catch (e) {
             console.error("Transcription error", e);
           }
-        }, 3000);
+        }, 1000);
         chunkerRef.current = chunker;
         await chunker.start();
         toast({ 
@@ -258,7 +261,7 @@ const CallRoom: React.FC = () => {
             <CardHeader>
               <CardTitle>Live Transcript</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-h-96 overflow-y-auto pr-2">
               <TranscriptList items={transcripts} />
             </CardContent>
           </Card>

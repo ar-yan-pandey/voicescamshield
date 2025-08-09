@@ -5,6 +5,7 @@ export class AudioChunker {
   private source: MediaStreamAudioSourceNode | null = null;
   private buffer: Float32Array[] = [];
   private flushTimer: number | null = null;
+  private paused = false;
 
   constructor(private onChunk: (base64Wav: string) => void | Promise<void>, private chunkMs = 3000) {}
 
@@ -25,10 +26,10 @@ export class AudioChunker {
     this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
     this.processor.onaudioprocess = (e) => {
+      if (this.paused) return;
       const input = e.inputBuffer.getChannelData(0);
       this.buffer.push(new Float32Array(input));
     };
-
     this.source.connect(this.processor);
     this.processor.connect(this.audioContext.destination);
 
@@ -59,8 +60,13 @@ export class AudioChunker {
     this.buffer = [];
   }
 
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    if (paused) this.buffer = [];
+  }
+
   private flush() {
-    if (this.buffer.length === 0) return;
+    if (this.paused || this.buffer.length === 0) return;
     // Concatenate Float32
     const length = this.buffer.reduce((acc, b) => acc + b.length, 0);
     const combined = new Float32Array(length);

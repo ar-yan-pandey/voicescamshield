@@ -148,7 +148,7 @@ const CallRoom: React.FC = () => {
                   const { value, level } = computeRisk(next);
                   setRiskValue(value);
                   setRiskLevel(level);
-                  if (value >= 50 && !alertShownRef.current) {
+                  if (value > 50 && !alertShownRef.current) {
                     alertShownRef.current = true;
                     setShowScamAlert(true);
                   }
@@ -196,6 +196,20 @@ const CallRoom: React.FC = () => {
       chunkerRef.current = null;
     };
   }, []);
+
+  // Ensure popup opens whenever risk goes above 50%
+  useEffect(() => {
+    if (riskValue > 50 && !alertShownRef.current) {
+      alertShownRef.current = true;
+      setShowScamAlert(true);
+    }
+  }, [riskValue]);
+
+  // Reset popup state when switching rooms
+  useEffect(() => {
+    alertShownRef.current = false;
+    setShowScamAlert(false);
+  }, [id]);
 
   return (
     <main className="min-h-screen container py-8">

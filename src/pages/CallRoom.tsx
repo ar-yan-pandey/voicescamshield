@@ -392,6 +392,14 @@ const CallRoom: React.FC = () => {
               Continue call
             </AlertDialogCancel>
             <Button
+              onClick={() => {
+                try { agent.start(); toast({ title: "Distracting agent started" }); } catch {}
+                setShowScamAlert(false);
+              }}
+            >
+              Start Distracting Agent
+            </Button>
+            <Button
               variant="secondary"
               onClick={() => {
                 setShowScamAlert(false);

@@ -23,6 +23,7 @@ const CallRoom: React.FC = () => {
   const chunkerRef = useRef<AudioChunker | null>(null);
   
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [riskValue, setRiskValue] = useState(0);
   const [riskLevel, setRiskLevel] = useState<RiskLevel>("low");
   const [aiScamCheckEnabled, setAiScamCheckEnabled] = useState(false);
@@ -373,8 +374,20 @@ const CallRoom: React.FC = () => {
             <CardHeader>
               <CardTitle>Live Transcript</CardTitle>
             </CardHeader>
-            <CardContent className="max-h-96 overflow-y-auto pr-2">
-              <TranscriptList items={transcripts} />
+            <CardContent className="space-y-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowTranscript((v) => !v)}
+                aria-expanded={showTranscript}
+                className="w-full"
+              >
+                {showTranscript ? "Hide Transcription" : "Show Transcription"}
+              </Button>
+              {showTranscript && (
+                <div className="max-h-96 overflow-y-auto pr-2">
+                  <TranscriptList items={transcripts} />
+                </div>
+              )}
             </CardContent>
           </Card>
 

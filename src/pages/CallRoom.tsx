@@ -298,7 +298,7 @@ const CallRoom: React.FC = () => {
                 <video ref={localVideoRef} autoPlay playsInline muted className="w-full aspect-video bg-muted" />
                 <div className="p-3 flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">Local</div>
-                  <Button variant="secondary" onClick={handleStart}>Enable Camera & Connect</Button>
+                  <Button variant="secondary" onClick={handleStart}>{role === "callee" ? "Join" : "Enable Camera & Connect"}</Button>
                 </div>
               </div>
               <div className="rounded-lg overflow-hidden border bg-card">
@@ -308,7 +308,7 @@ const CallRoom: React.FC = () => {
                     <div className="text-sm text-muted-foreground">Remote</div>
                     <div className="text-xs text-muted-foreground">{connected ? "Connected" : "Not connected"}</div>
                   </div>
-                  {!connected && (
+                  {!connected && role !== "callee" && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
                         size="icon"
@@ -341,24 +341,26 @@ const CallRoom: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={handleStart}>Enable Camera & Connect</Button>
+                    <Button onClick={handleStart}>{role === "callee" ? "Join" : "Enable Camera & Connect"}</Button>
                     <Button variant={micEnabled ? "secondary" : "destructive"} onClick={toggleMic}>
                       {micEnabled ? "Mute Mic" : "Unmute Mic"}
                     </Button>
                     <Button variant={camEnabled ? "secondary" : "destructive"} onClick={toggleCam}>
                       {camEnabled ? "Turn Off Camera" : "Turn On Camera"}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        try {
-                          navigator.clipboard.writeText(window.location.href);
-                          toast({ title: "Link copied", description: "Share this link to invite" });
-                        } catch {}
-                      }}
-                    >
-                      Copy Call Link
-                    </Button>
+                    {role !== "callee" && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText(window.location.href);
+                            toast({ title: "Link copied", description: "Share this link to invite" });
+                          } catch {}
+                        }}
+                      >
+                        Copy Call Link
+                      </Button>
+                    )}
                     <Button variant="destructive" onClick={handleEnd}>End Call</Button>
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -368,13 +370,16 @@ const CallRoom: React.FC = () => {
               </Card>
             </div>
 
-            <div className="mt-4 flex justify-end">
-              <Button variant="destructive" onClick={handleEnd}>End</Button>
-            </div>
+            {role !== "callee" && (
+              <div className="mt-4 flex justify-end">
+                <Button variant="destructive" onClick={handleEnd}>End</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        {role !== "callee" && (
+          <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Language</CardTitle>
@@ -467,9 +472,11 @@ const CallRoom: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
 
-      <div className="fixed top-6 right-6 z-50 flex flex-row gap-3">
+      {role !== "callee" && (
+        <div className="fixed top-6 right-6 z-50 flex flex-row gap-3">
         <Button 
           onClick={toggleAiScamCheck}
           variant={aiScamCheckEnabled ? "destructive" : "default"}
@@ -484,7 +491,8 @@ const CallRoom: React.FC = () => {
         >
           {agent.active ? "Stop Agent" : "Distracting Agent"}
         </Button>
-      </div>
+        </div>
+      )}
 
       <AlertDialog open={showScamAlert} onOpenChange={setShowScamAlert}>
         <AlertDialogContent>
@@ -654,7 +662,7 @@ const CallRoom: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <RiskWidget value={riskValue} level={riskLevel} />
+      {role !== "callee" && <RiskWidget value={riskValue} level={riskLevel} />}
     </main>
   );
 };

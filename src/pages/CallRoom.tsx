@@ -13,6 +13,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { detectLanguageFromText, DetectedLanguage } from "@/utils/language";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useDistractorAgent } from "@/hooks/useDistractorAgent";
+import { Usb, Bluetooth } from "lucide-react";
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
@@ -240,8 +241,10 @@ const CallRoom: React.FC = () => {
                   {!connected && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        aria-label="Connect via USB"
+                        title="Connect via USB"
                         onClick={() =>
                           toast({
                             title: "Connect via USB",
@@ -249,11 +252,13 @@ const CallRoom: React.FC = () => {
                           })
                         }
                       >
-                        Connect with USB
+                        <Usb />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        aria-label="Connect via Bluetooth"
+                        title="Connect via Bluetooth"
                         onClick={() =>
                           toast({
                             title: "Connect via Bluetooth",
@@ -261,7 +266,7 @@ const CallRoom: React.FC = () => {
                           })
                         }
                       >
-                        Connect with Bluetooth
+                        <Bluetooth />
                       </Button>
                     </div>
                   )}

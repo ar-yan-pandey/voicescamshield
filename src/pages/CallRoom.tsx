@@ -242,24 +242,45 @@ const CallRoom: React.FC = () => {
     check();
   }, [btDialogOpen]);
 
-  // Keyboard shortcuts: O = sensitive popup, X = scam popup
+  // Keyboard shortcuts: O = sensitive popup, X = scam popup, Z = inject demo transcript & set English
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const isTyping = tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable;
+      const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
       if (isTyping) return;
-      if (e.key.toLowerCase() === 'o') {
+      const key = e.key.toLowerCase();
+      if (key === "o") {
         if (micEnabled) toggleMic();
         setSensitiveAlertOpen(true);
         sensitiveAlertShownRef.current = true;
-      } else if (e.key.toLowerCase() === 'x') {
+      } else if (key === "x") {
         setShowScamAlert(true);
         alertShownRef.current = true;
+      } else if (key === "z") {
+        setDetectedLang({ code: "en", name: "English" });
+        setShowTranscript(true);
+        const sentence = "Hi, I am Aryan";
+        setTranscripts((prev) => {
+          const local = detectScamLocally(sentence);
+          const riskLabel = getRiskLevel(local.score);
+          const item: TranscriptItem = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            text: sentence,
+            timestamp: new Date().toLocaleTimeString(),
+            risk: riskLabel,
+            score: local.score,
+          };
+          const next = [item, ...prev].slice(0, 100);
+          const { value, level } = computeRisk(next);
+          setRiskValue(value);
+          setRiskLevel(level);
+          return next;
+        });
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [micEnabled]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [micEnabled, computeRisk]);
 
   return (
     <main className="min-h-screen container py-8">

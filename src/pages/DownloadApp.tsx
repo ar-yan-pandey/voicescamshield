@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 const DownloadApp = () => {
   const navigate = useNavigate();
   const startCall = () => {
@@ -11,10 +10,8 @@ const DownloadApp = () => {
   };
   useEffect(() => {
     const title = "Download Voice Scam Shield Overlay";
-    const description =
-      "Download the Voice Scam Shield overlay app to transcribe calls in real time and detect scams.";
+    const description = "Download the Voice Scam Shield overlay app to transcribe calls in real time and detect scams.";
     document.title = title;
-
     const ensureTag = (selector: string, create: () => HTMLElement) => {
       let el = document.head.querySelector(selector) as HTMLElement | null;
       if (!el) {
@@ -23,32 +20,32 @@ const DownloadApp = () => {
       }
       return el;
     };
-
     const metaDesc = ensureTag('meta[name="description"]', () => {
       const m = document.createElement("meta");
       m.setAttribute("name", "description");
       return m;
     }) as HTMLMetaElement;
     metaDesc.setAttribute("content", description);
-
     const linkCanonical = ensureTag('link[rel="canonical"]', () => {
       const l = document.createElement("link");
       l.setAttribute("rel", "canonical");
       return l;
     }) as HTMLLinkElement;
     linkCanonical.setAttribute("href", window.location.origin + "/download-app");
-
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       name: "Voice Scam Shield Overlay",
       applicationCategory: "CommunicationApplication",
       operatingSystem: "Windows, Android, Chrome",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD"
+      },
       description,
-      url: window.location.origin + "/download-app",
+      url: window.location.origin + "/download-app"
     };
-
     const ldTag = ensureTag('script[type="application/ld+json"]#downloadAppLd', () => {
       const s = document.createElement("script");
       s.type = "application/ld+json";
@@ -57,9 +54,7 @@ const DownloadApp = () => {
     }) as HTMLScriptElement;
     ldTag.textContent = JSON.stringify(jsonLd);
   }, []);
-
-  return (
-    <main className="min-h-screen relative overflow-hidden">
+  return <main className="min-h-screen relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-primary opacity-20 pointer-events-none" />
       <header className="container py-10">
         <nav className="flex items-center justify-between">
@@ -82,10 +77,11 @@ const DownloadApp = () => {
             Use on Windows
           </Button>
           <a href="/downloads/overlay-android.txt" download className="inline-flex" aria-label="Download Android preview package">
-            <Button variant="secondary">Download for Android (Preview)</Button>
+            <Button variant="secondary">Download for Android</Button>
           </a>
           <a href="/downloads/overlay-chrome.txt" className="inline-flex" aria-label="Get Chrome Extension preview">
-            <Button variant="outline">Get Chrome Extension (Preview)</Button>
+            <Button variant="outline">Get Chrome Extension
+          </Button>
           </a>
         </div>
       </section>
@@ -128,8 +124,6 @@ const DownloadApp = () => {
           </ol>
         </div>
       </section>
-    </main>
-  );
+    </main>;
 };
-
 export default DownloadApp;

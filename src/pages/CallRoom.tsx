@@ -12,6 +12,7 @@ import { detectScamLocally, getRiskLevel } from "@/utils/scamDetection";
 import LanguageSelector from "@/components/LanguageSelector";
 import { detectLanguageFromText, DetectedLanguage } from "@/utils/language";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDistractorAgent } from "@/hooks/useDistractorAgent";
 import { Usb, Bluetooth } from "lucide-react";
 const CallRoom: React.FC = () => {
@@ -34,6 +35,10 @@ const CallRoom: React.FC = () => {
   const pendingTextRef = useRef<string>("");
   const { connected, presenceCount, role, start, end, replaceAudioTrack, restoreAudioTrack } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
   const agent = useDistractorAgent({ transcripts, replaceAudioTrack, restoreAudioTrack, targetLang: selectedLang });
+  const [usbDialogOpen, setUsbDialogOpen] = useState(false);
+  const [btDialogOpen, setBtDialogOpen] = useState(false);
+  const [btAvailable, setBtAvailable] = useState<boolean | null>(null);
+  const [btDevices, setBtDevices] = useState<{ id: string; name: string }[]>([]);
 
   const computeRisk = useCallback((items: TranscriptItem[]) => {
     if (items.length === 0) return { value: 0, level: "low" as RiskLevel };
@@ -212,6 +217,19 @@ const CallRoom: React.FC = () => {
     setShowScamAlert(false);
   }, [id]);
 
+  useEffect(() => {
+    if (!btDialogOpen) return;
+    const check = async () => {
+      try {
+        const avail = await (navigator as any).bluetooth?.getAvailability?.();
+        setBtAvailable(!!avail);
+      } catch {
+        setBtAvailable(false);
+      }
+    };
+    check();
+  }, [btDialogOpen]);
+
   return (
     <main className="min-h-screen container py-8">
       <h1 className="text-3xl font-semibold tracking-tight">Call Room</h1>
@@ -245,12 +263,7 @@ const CallRoom: React.FC = () => {
                         variant="secondary"
                         aria-label="Connect via USB"
                         title="Connect via USB"
-                        onClick={() =>
-                          toast({
-                            title: "Connect via USB",
-                            description: "Demo: plug in your device via USB and grant permission.",
-                          })
-                        }
+                        onClick={() => setUsbDialogOpen(true)}
                       >
                         <Usb />
                       </Button>
@@ -259,12 +272,7 @@ const CallRoom: React.FC = () => {
                         variant="secondary"
                         aria-label="Connect via Bluetooth"
                         title="Connect via Bluetooth"
-                        onClick={() =>
-                          toast({
-                            title: "Connect via Bluetooth",
-                            description: "Demo: enable Bluetooth and pair your device.",
-                          })
-                        }
+                        onClick={() => setBtDialogOpen(true)}
                       >
                         <Bluetooth />
                       </Button>
@@ -458,6 +466,95 @@ const CallRoom: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={usbDialogOpen} onOpenChange={setUsbDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect a USB Webcam</DialogTitle>
+            <DialogDescription>
+              Plug in a USB webcam and grant permission to use it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setUsbDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                  stream.getTracks().forEach((t) => t.stop());
+                  toast({ title: "USB webcam connected" });
+                } catch (e) {
+                  toast({ title: "Unable to access webcam", variant: "destructive" });
+                } finally {
+                  setUsbDialogOpen(false);
+                }
+              }}
+            >
+              Connect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={btDialogOpen} onOpenChange={setBtDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Bluetooth devices</DialogTitle>
+            <DialogDescription>
+              {btAvailable === null
+                ? "Checking Bluetooth availability..."
+                : btAvailable
+                ? "Bluetooth is on. Scan for nearby devices."
+                : "Bluetooth is off or unsupported. Turn it on to scan."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {btDevices.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No devices yet.</div>
+            ) : (
+              <ul className="space-y-2">
+                {btDevices.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between text-sm">
+                    <span>{d.name}</span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        toast({ title: "Connected to device", description: d.name });
+                        setBtDialogOpen(false);
+                      }}
+                    >
+                      Connect
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setBtDialogOpen(false)}>Close</Button>
+            <Button
+              onClick={async () => {
+                try {
+                  const avail = await (navigator as any).bluetooth?.getAvailability?.();
+                  setBtAvailable(!!avail);
+                  const device = await (navigator as any).bluetooth?.requestDevice?.({ acceptAllDevices: true });
+                  if (device) {
+                    const id = device.id || Math.random().toString(36).slice(2);
+                    const name = device.name || "Unnamed device";
+                    setBtDevices((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, name }]));
+                  }
+                } catch (e) {
+                  /* user canceled or unavailable */
+                }
+              }}
+              disabled={btAvailable === false}
+            >
+              Scan for devices
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RiskWidget value={riskValue} level={riskLevel} />
     </main>

@@ -32,6 +32,8 @@ const CallRoom: React.FC = () => {
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
   const [showScamAlert, setShowScamAlert] = useState(false);
   const alertShownRef = useRef(false);
+  const [sensitiveAlertOpen, setSensitiveAlertOpen] = useState(false);
+  const sensitiveAlertShownRef = useRef(false);
   const pendingTextRef = useRef<string>("");
   const { connected, presenceCount, role, start, end, replaceAudioTrack, restoreAudioTrack } = useWebRTCRoom(id || "default", localVideoRef, remoteVideoRef);
   const agent = useDistractorAgent({ transcripts, replaceAudioTrack, restoreAudioTrack, targetLang: selectedLang });
@@ -131,6 +133,13 @@ const CallRoom: React.FC = () => {
                     const sentence = s.trim();
                     if (sentence.length < 4) continue;
 
+                    // Sensitive terms: auto-mute and warn once per room
+                    if (!sensitiveAlertShownRef.current && /\b(otp|password)s?\b/i.test(sentence)) {
+                      if (micEnabled) toggleMic();
+                      sensitiveAlertShownRef.current = true;
+                      setSensitiveAlertOpen(true);
+                    }
+
                     // Local score for sentence
                     const local = detectScamLocally(sentence);
                     let riskScore = local.score;
@@ -215,6 +224,8 @@ const CallRoom: React.FC = () => {
   useEffect(() => {
     alertShownRef.current = false;
     setShowScamAlert(false);
+    sensitiveAlertShownRef.current = false;
+    setSensitiveAlertOpen(false);
   }, [id]);
 
   useEffect(() => {
@@ -555,6 +566,37 @@ const CallRoom: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={sensitiveAlertOpen} onOpenChange={setSensitiveAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>We muted your microphone</AlertDialogTitle>
+            <AlertDialogDescription>
+              We detected sensitive words like OTP or Password. Please do not share passwords or one-time codes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setSensitiveAlertOpen(false);
+                if (!micEnabled) toggleMic();
+              }}
+            >
+              Continue (I Trust the Source)
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSensitiveAlertOpen(false);
+                try { agent.stop(); } catch {}
+                end();
+                toast({ title: "Reported", description: "Conversation reported and ended." });
+              }}
+            >
+              Report and End
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RiskWidget value={riskValue} level={riskLevel} />
     </main>

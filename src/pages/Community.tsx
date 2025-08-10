@@ -8,6 +8,12 @@ const sample = [
   { name: "Lottery Center", phone: "+61 2 9374 4000", notes: "Upfront fee to claim prize" },
 ];
 
+// Demo: Long list of reported phone numbers (generated)
+const reportedNumbers: string[] = Array.from({ length: 200 }, (_, i) => {
+  const n = (1000000 + i).toString();
+  return `+1 (555) ${n.slice(0, 3)}-${n.slice(3)}`;
+});
+
 const Community: React.FC = () => {
   return (
     <main className="min-h-screen container py-10">
@@ -40,6 +46,23 @@ const Community: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Reported Phone Numbers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="max-h-96 overflow-y-auto rounded-md border bg-card/50 p-3">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {reportedNumbers.map((num, i) => (
+                <li key={i} className="text-sm font-mono px-3 py-2 rounded bg-secondary text-secondary-foreground">
+                  {num}
+                </li>
+              ))}
+            </ul>
           </div>
         </CardContent>
       </Card>

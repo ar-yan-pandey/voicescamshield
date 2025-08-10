@@ -232,9 +232,39 @@ const CallRoom: React.FC = () => {
               </div>
               <div className="rounded-lg overflow-hidden border bg-card">
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-full aspect-video bg-muted" />
-                <div className="p-3 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">Remote</div>
-                  <div className="text-xs text-muted-foreground">{connected ? "Connected" : "Not connected"}</div>
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">Remote</div>
+                    <div className="text-xs text-muted-foreground">{connected ? "Connected" : "Not connected"}</div>
+                  </div>
+                  {!connected && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          toast({
+                            title: "Connect via USB",
+                            description: "Demo: plug in your device via USB and grant permission.",
+                          })
+                        }
+                      >
+                        Connect with USB
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          toast({
+                            title: "Connect via Bluetooth",
+                            description: "Demo: enable Bluetooth and pair your device.",
+                          })
+                        }
+                      >
+                        Connect with Bluetooth
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

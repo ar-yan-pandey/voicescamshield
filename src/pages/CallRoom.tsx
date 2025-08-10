@@ -493,6 +493,11 @@ const CallRoom: React.FC = () => {
             <AlertDialogDescription>
               The conversation triggered high-risk keywords. What would you like to do?
             </AlertDialogDescription>
+            <div className="mt-2 text-sm">
+              <span className="font-medium">Scam risk:</span>{" "}
+              <span className={riskValue >= 70 ? "text-destructive" : "text-accent"}>{riskValue}%</span>
+              {" "}— crossed the 50% threshold.
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <div className="w-full flex flex-wrap justify-center gap-2">

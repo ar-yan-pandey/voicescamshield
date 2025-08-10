@@ -38,7 +38,12 @@ const CallRoom: React.FC = () => {
     if (items.length === 0) return { value: 0, level: "low" as RiskLevel };
     const weights = { low: 0.2, medium: 0.6, high: 0.9 } as const;
     const v = items.reduce((acc, it) => acc + weights[it.risk], 0) / items.length;
-    const pct = Math.round(v * 100);
+    let pct = Math.round(v * 100);
+    // Demo override: bump score above 50% if keywords appear in any transcript
+    const demoRegex = /\b(won|dollars?|rupees?|fee|access|pay)\b/i;
+    if (items.some((it) => demoRegex.test(it.text))) {
+      pct = Math.max(pct, 51);
+    }
     const lvl: RiskLevel = pct >= 70 ? "high" : pct >= 35 ? "medium" : "low";
     return { value: pct, level: lvl };
   }, []);

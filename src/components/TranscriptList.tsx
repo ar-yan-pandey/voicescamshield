@@ -39,16 +39,8 @@ export const TranscriptList: React.FC<TranscriptListProps> = ({ items, className
             key={item.id}
             className="rounded-lg border bg-card text-card-foreground p-3 shadow-sm transition-smooth hover:shadow-glow"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-start gap-3">
               <div className="text-sm text-muted-foreground">{item.timestamp}</div>
-              <span
-                className={cn(
-                  "px-2 py-1 rounded text-xs font-medium",
-                  riskBadge(item.risk)
-                )}
-              >
-                {item.risk.toUpperCase()} • {(item.score * 100).toFixed(0)}%
-              </span>
             </div>
             <p className="mt-2 text-sm leading-relaxed">{item.text}</p>
           </article>

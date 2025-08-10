@@ -365,6 +365,43 @@ const CallRoom: React.FC = () => {
         </Button>
       </div>
 
+      <AlertDialog open={showScamAlert} onOpenChange={setShowScamAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Potential scam detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              The conversation triggered high-risk keywords. What would you like to do?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowScamAlert(false)}>
+              Continue call
+            </AlertDialogCancel>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowScamAlert(false);
+                try { agent.stop(); } catch {}
+                end();
+                toast({ title: "Call ended" });
+              }}
+            >
+              End call
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                setShowScamAlert(false);
+                try { agent.stop(); } catch {}
+                end();
+                toast({ title: "Reported as scam", description: "Thanks for letting us know." });
+              }}
+            >
+              End & Report
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <RiskWidget value={riskValue} level={riskLevel} />
     </main>
   );

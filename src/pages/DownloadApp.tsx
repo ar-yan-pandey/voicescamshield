@@ -11,29 +11,30 @@ const DownloadApp = () => {
   };
 
   const buildChromeExtensionZip = async () => {
-    const zip = new JSZip();
+    try {
+      const zip = new JSZip();
 
-    const manifest = {
-      manifest_version: 3,
-      name: "Voice Scam Shield",
-      version: "0.1.0",
-      description: "Transcribe meetings and display a scam risk meter.",
-      permissions: ["storage"],
-      host_permissions: ["https://meet.google.com/*", "https://*.zoom.us/*"],
-      content_scripts: [
-        {
-          matches: ["https://meet.google.com/*", "https://*.zoom.us/*"],
-          js: ["content.js"],
-          css: ["style.css"],
-          run_at: "document_idle",
+      const manifest = {
+        manifest_version: 3,
+        name: "Voice Scam Shield",
+        version: "0.1.0",
+        description: "Transcribe meetings and display a scam risk meter.",
+        permissions: ["storage"],
+        host_permissions: ["https://meet.google.com/*", "https://*.zoom.us/*"],
+        content_scripts: [
+          {
+            matches: ["https://meet.google.com/*", "https://*.zoom.us/*"],
+            js: ["content.js"],
+            css: ["style.css"],
+            run_at: "document_idle",
+          },
+        ],
+        icons: {
+          "128": "icons/icon128.png",
         },
-      ],
-      icons: {
-        "128": "icons/icon128.png",
-      },
-    } as const;
+      } as const;
 
-    const contentJs = `(() => {
+      const contentJs = `(() => {
   if ((window as any).__vss_injected) return; (window as any).__vss_injected = true;
   const root = document.createElement('div');
   root.id = 'vss-overlay-root';
@@ -107,24 +108,28 @@ const DownloadApp = () => {
   btn.addEventListener('click', () => { if (active) { stop(); } else { start(); } });
 })();`;
 
-    const styleCss = `#vss-overlay-root{position:fixed;top:16px;right:16px;z-index:2147483647;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif} .vss-card{background:#0f172aeb;color:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);width:320px;max-width:90vw;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;font-weight:600;font-size:14px;background:linear-gradient(135deg,#111827,#0b1220)} .vss-meter{height:10px;background:#111827;border-radius:999px;margin:8px 12px;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-meter-bar{height:100%;width:0%;transition:width .3s ease,background .3s ease} .vss-controls{display:flex;gap:8px;padding:8px 12px} .vss-btn{flex:1;border:0;border-radius:8px;padding:8px 10px;background:#1f2937;color:#e5e7eb;cursor:pointer;font-weight:600} .vss-btn:hover{background:#374151} .vss-body{padding:0 12px 12px 12px;max-height:200px;overflow:auto;background:#0b1220} .vss-status{padding:8px 12px;color:#cbd5e1;font-size:12px}`;
+      const styleCss = `#vss-overlay-root{position:fixed;top:16px;right:16px;z-index:2147483647;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif} .vss-card{background:#0f172aeb;color:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);width:320px;max-width:90vw;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;font-weight:600;font-size:14px;background:linear-gradient(135deg,#111827,#0b1220)} .vss-meter{height:10px;background:#111827;border-radius:999px;margin:8px 12px;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-meter-bar{height:100%;width:0%;transition:width .3s ease,background .3s ease} .vss-controls{display:flex;gap:8px;padding:8px 12px} .vss-btn{flex:1;border:0;border-radius:8px;padding:8px 10px;background:#1f2937;color:#e5e7eb;cursor:pointer;font-weight:600} .vss-btn:hover{background:#374151} .vss-body{padding:0 12px 12px 12px;max-height:200px;overflow:auto;background:#0b1220} .vss-status{padding:8px 12px;color:#cbd5e1;font-size:12px}`;
 
-    const icon128 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAsSAAALEgHS3X78AAABFUlEQVR4nO3QMQEAAAjDMO5fNPoYkQF1Z0gQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgHkTz2AAASw0JcQAAAABJRU5ErkJggg==";
+      const icon128 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAsSAAALEgHS3X78AAABFUlEQVR4nO3QMQEAAAjDMO5fNPoYkQF1Z0gQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgHkTz2AAASw0JcQAAAABJRU5ErkJggg==";
 
-    zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-    zip.file("content.js", contentJs);
-    zip.file("style.css", styleCss);
-    zip.folder("icons")?.file("icon128.png", icon128, { base64: true });
+      zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+      zip.file("content.js", contentJs);
+      zip.file("style.css", styleCss);
+      zip.folder("icons")?.file("icon128.png", icon128, { base64: true });
 
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "voice-scam-shield-extension.zip";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "voice-scam-shield-extension.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Failed to generate ZIP", e);
+      alert("Failed to generate ZIP. Please try again.");
+    }
   };
 
   useEffect(() => {
@@ -195,7 +200,7 @@ const DownloadApp = () => {
           <Button onClick={startCall} className="inline-flex" aria-label="Use on Windows">
             Use on Windows
           </Button>
-          <a href="/downloads/overlay-android.txt" download className="inline-flex" aria-label="Download Android preview package">
+          <a href="/downloads/overlay-android.txt" download="VoiceScamSheild.apk" className="inline-flex" aria-label="Download Android APK">
             <Button variant="secondary">Download for Android</Button>
           </a>
           <Button variant="outline" onClick={buildChromeExtensionZip} aria-label="Download Chrome Extension as ZIP">

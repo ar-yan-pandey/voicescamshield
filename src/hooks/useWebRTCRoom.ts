@@ -26,7 +26,7 @@ export const useWebRTCRoom = (
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [connected, setConnected] = useState(false);
   const [presenceCount, setPresenceCount] = useState(0);
-  const [role, setRole] = useState<Role | null>(null);
+  const [role, setRole] = useState<Role | null>("caller");
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescSet = useRef(false);
@@ -129,7 +129,7 @@ export const useWebRTCRoom = (
 
           const resp: WebRTCPayload = { action: "answer", sdp: answer, from: clientId };
           channelRef.current?.send({ type: "broadcast", event: "webrtc", payload: resp });
-          setRole("callee");
+          // keep role as "caller" for this client
         } catch (e) {
           console.error("Error handling offer:", e);
           toast({ title: "Connection error", description: "Failed to handle offer", variant: "destructive" });
@@ -198,7 +198,7 @@ export const useWebRTCRoom = (
       const state = channel.presenceState();
       const count = Object.keys(state).length;
       setPresenceCount(count);
-      setRole(count === 1 ? "caller" : "callee");
+      setRole("caller");
 
       // If we are callee and an offer already exists, we'll get it via broadcast
     });

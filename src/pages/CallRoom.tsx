@@ -716,7 +716,7 @@ const [btDevices, setBtDevices] = useState<{ id: string; name: string }[]>([]);
           <AlertDialogHeader>
             <AlertDialogTitle>Deepfake Detected</AlertDialogTitle>
             <AlertDialogDescription>
-              {deepfakeName ? `Identified as ${deepfakeName}.` : "Identifying deepfake... Press T (Donald Trump), E (Elon Musk), U (Unknown)."}
+              {deepfakeName ? `Identified as ${deepfakeName}.` : "Identifying deepfake..."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="mt-2">

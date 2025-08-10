@@ -1,73 +1,115 @@
-# Welcome to your Lovable project
+Voice Scam Shield
+Real-time, browser-based call protection. Make P2P calls, transcribe speech live, highlight scam risk, and optionally let a local voice agent respond using on-device TTS. Includes a demo deepfake-alert popup.
 
-## Project info
+Features
 
-**URL**: https://lovable.dev/projects/baea0147-0ae4-4333-aa96-d2ebf5a7546f
+WebRTC video/audio calls (peer-to-peer) with Supabase Realtime for signaling
+Live transcription with optional AI risk scoring
+Local heuristic scam detection as a fallback/augment
+Optional “Distractor Agent” for short, evasive replies:
+Primary online LLM: Gemini 1.5 Flash (Edge Function)
+Fallback local LLM in-browser via WebLLM (Llama-3.1-8B-Instruct-q4f32_1-MLC)
+On-device TTS via Piper + onnxruntime-web (WASM SIMD)
 
-## How can I edit this code?
+Tech Stack
 
-There are several ways of editing your application.
+Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui (Radix UI)
+Realtime/signaling: Supabase Realtime
+Edge Functions (Deno): Supabase Functions
+Online AI:
+Transcription/risk: Google Gemini 2.0 Flash (gemini-transcribe function)
+Agent replies: Google Gemini 1.5 Flash (agent-reply function)
 
-**Use Lovable**
+On-device AI:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/baea0147-0ae4-4333-aa96-d2ebf5a7546f) and start prompting.
 
-Changes made via Lovable will be committed automatically to this repo.
+WebLLM runtime: @mlc-ai/web-llm
+Model (fallback): Llama-3.1-8B-Instruct-q4f32_1-MLC
+TTS: @mintplex-labs/piper-tts-web on onnxruntime-web (WASM SIMD)
+Language detection: franc + langs
+Heuristic scam detection: local rule-based scoring (no external model)
+Project Structure (selected)
+src/pages/CallRoom.tsx — main call UI, transcription, alerts, keyboard shortcuts
+src/hooks/useWebRTCRoom.ts — WebRTC + Supabase signaling
+src/utils/AudioChunker.ts — mic capture, VAD, WAV encoding (24kHz mono)
+src/utils/scamDetection.ts — local heuristic risk scoring
+src/hooks/useDistractorAgent.ts — agent replies (Gemini → fallback WebLLM) + Piper TTS
+supabase/functions/gemini-transcribe — Gemini 2.0 Flash transcription (+ optional scam risk)
+supabase/functions/agent-reply — Gemini 1.5 Flash short “stalling” replies
+Setup
 
-**Use your preferred IDE**
+Prerequisites:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+Node.js 18+ and npm
+A Supabase project (optional if using the included hosted project); Supabase CLI if you want to deploy functions
+A Google Generative AI key (GEMINI_API_KEY) for Edge Functions
+Clone and install
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Run the app
 npm run dev
-```
+Open the printed local URL
+Using the hosted Supabase (default)
+The app is preconfigured to use an existing Supabase project for signaling and Edge Functions:
+URL: https://qmgjplrejeslnqyoagvu.supabase.co
+The client anon key is embedded for convenience in src/integrations/supabase/client.ts
+The CallRoom posts audio chunks to:
+https://qmgjplrejeslnqyoagvu.functions.supabase.co/functions/v1/gemini-transcribe
+This works out of the box if that project is active and has GEMINI_API_KEY set. If you fork to your own Supabase, see “Bring your own Supabase”.
 
-**Edit a file directly in GitHub**
+If you want to use your own Supabase project:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+A) Update the client
 
-**Use GitHub Codespaces**
+Edit src/integrations/supabase/client.ts to point to your project URL and anon key.
+B) Deploy Edge Functions
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Install the Supabase CLI and log in
+Set your GEMINI_API_KEY secret:
+supabase secrets set GEMINI_API_KEY=your_google_genai_key
+Deploy functions:
+supabase functions deploy gemini-transcribe
+supabase functions deploy agent-reply
+C) Point the frontend to your functions
 
-## What technologies are used for this project?
+In src/pages/CallRoom.tsx, update the fetch URL used for transcription to your new functions endpoint:
+https://YOUR-PROJECT-REF.functions.supabase.co/functions/v1/gemini-transcribe
+Notes:
 
-This project is built with:
+Both functions have CORS set to "*"
+supabase/config.toml sets verify_jwt = false for these functions (public callable)
+Environment and Keys
+Client (Vite):
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+None required for default hosted setup; Supabase client URL/key are embedded in src/integrations/supabase/client.ts
+If you want to hide keys and use your own project, refactor to use VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+Supabase Edge Functions:
 
-## How can I deploy this project?
+GEMINI_API_KEY: required for both gemini-transcribe and agent-reply
+Optional local function serve:
 
-Simply open [Lovable](https://lovable.dev/projects/baea0147-0ae4-4333-aa96-d2ebf5a7546f) and click on Share -> Publish.
+supabase functions serve --env-file .env
+.env should contain GEMINI_API_KEY=...
+Development Scripts
+npm run dev — start Vite dev server
+npm run build — production build
+npm run preview — preview production build
+npm run lint — ESLint
+Key Dependencies (high level)
+Realtime/DB: @supabase/supabase-js
+WebRTC: browser RTCPeerConnection (with Google & Twilio STUN servers)
+On-device LLM: @mlc-ai/web-llm (Llama-3.1-8B-Instruct-q4f32_1-MLC fallback)
+TTS: @mintplex-labs/piper-tts-web + onnxruntime-web (WASM SIMD)
+Transcription (online): Google Gemini 2.0 Flash via Edge Function
+Agent (online): Google Gemini 1.5 Flash via Edge Function
+UI: React, shadcn/ui (Radix UI), Tailwind CSS
+Language detection: franc, langs
+Charts: recharts
+Full dependency versions are in package.json; highlights:
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+react 18.3.x, vite 5.x, typescript 5.x
+@supabase/supabase-js ^2.54.0
+@mlc-ai/web-llm ^0.2.79
+@mintplex-labs/piper-tts-web ^1.0.4
+onnxruntime-web ^1.22.0
+franc ^6.2.0, langs ^2.0.0
+@radix-ui/*, shadcn/ui components

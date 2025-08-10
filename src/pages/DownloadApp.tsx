@@ -1,8 +1,14 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const DownloadApp = () => {
+  const navigate = useNavigate();
+  const startCall = () => {
+    const id = Date.now().toString(36);
+    navigate(`/call/${id}`);
+  };
   useEffect(() => {
     const title = "Download Voice Scam Shield Overlay";
     const description =
@@ -37,7 +43,7 @@ const DownloadApp = () => {
       "@type": "SoftwareApplication",
       name: "Voice Scam Shield Overlay",
       applicationCategory: "CommunicationApplication",
-      operatingSystem: "Windows, macOS",
+      operatingSystem: "Windows, Android, Chrome",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       description,
       url: window.location.origin + "/download-app",
@@ -72,14 +78,14 @@ const DownloadApp = () => {
           Install the lightweight overlay to transcribe conversations in real time and alert you about potential scams.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <a href="/downloads/overlay-windows.txt" download className="inline-flex" aria-label="Download Windows preview package">
-            <Button>Download for Windows (Preview)</Button>
+          <Button onClick={startCall} className="inline-flex" aria-label="Use on Windows">
+            Use on Windows
+          </Button>
+          <a href="/downloads/overlay-android.txt" download className="inline-flex" aria-label="Download Android preview package">
+            <Button variant="secondary">Download for Android (Preview)</Button>
           </a>
-          <a href="/downloads/overlay-macos.txt" download className="inline-flex" aria-label="Download macOS preview package">
-            <Button variant="secondary">Download for macOS (Preview)</Button>
-          </a>
-          <a href="/downloads/overlay-chrome.txt" download className="inline-flex" aria-label="Download Chrome extension preview">
-            <Button variant="outline">Download Chrome Overlay (Preview)</Button>
+          <a href="/downloads/overlay-chrome.txt" className="inline-flex" aria-label="Get Chrome Extension preview">
+            <Button variant="outline">Get Chrome Extension (Preview)</Button>
           </a>
         </div>
       </section>

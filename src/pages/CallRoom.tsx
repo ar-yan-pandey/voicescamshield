@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDistractorAgent } from "@/hooks/useDistractorAgent";
 import { Usb, Bluetooth } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 const CallRoom: React.FC = () => {
   const { id } = useParams();
 
@@ -41,7 +42,13 @@ const CallRoom: React.FC = () => {
   const [usbDialogOpen, setUsbDialogOpen] = useState(false);
   const [btDialogOpen, setBtDialogOpen] = useState(false);
   const [btAvailable, setBtAvailable] = useState<boolean | null>(null);
-  const [btDevices, setBtDevices] = useState<{ id: string; name: string }[]>([]);
+const [btDevices, setBtDevices] = useState<{ id: string; name: string }[]>([]);
+
+  // Deepfake detection demo popup
+  const [deepfakeOpen, setDeepfakeOpen] = useState(false);
+  const [deepfakeProgress, setDeepfakeProgress] = useState(0);
+  const [deepfakeName, setDeepfakeName] = useState<string | null>(null);
+  const deepfakeTimerRef = useRef<number | null>(null);
 
   const computeRisk = useCallback((items: TranscriptItem[]) => {
     if (items.length === 0) return { value: 0, level: "low" as RiskLevel };
@@ -242,6 +249,25 @@ const CallRoom: React.FC = () => {
     check();
   }, [btDialogOpen]);
 
+  // Deepfake progress ticking
+  useEffect(() => {
+    if (!deepfakeOpen) {
+      if (deepfakeTimerRef.current) {
+        clearInterval(deepfakeTimerRef.current);
+        deepfakeTimerRef.current = null;
+      }
+      return;
+    }
+    const id = window.setInterval(() => {
+      setDeepfakeProgress((p) => (p >= 100 ? 100 : Math.min(100, p + 4)));
+    }, 120);
+    deepfakeTimerRef.current = id as unknown as number;
+    return () => {
+      clearInterval(id);
+      deepfakeTimerRef.current = null;
+    };
+  }, [deepfakeOpen]);
+
   // Keyboard shortcuts: O = sensitive popup, X = scam popup, Z = inject demo transcript & set English
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -249,6 +275,23 @@ const CallRoom: React.FC = () => {
       const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
       if (isTyping) return;
       const key = e.key.toLowerCase();
+
+      // Deepfake popup trigger
+      if (key === "d") {
+        setDeepfakeOpen(true);
+        setDeepfakeName(null);
+        setDeepfakeProgress(0);
+        return;
+      }
+      // Classification while popup is open
+      if (deepfakeOpen && (key === "t" || key === "e" || key === "u")) {
+        if (key === "t") setDeepfakeName("Donald Trump");
+        if (key === "e") setDeepfakeName("Elon Musk");
+        if (key === "u") setDeepfakeName("Unknown not famous personality");
+        setDeepfakeProgress(100);
+        return;
+      }
+
       if (key === "o") {
         if (micEnabled) toggleMic();
         setSensitiveAlertOpen(true);
@@ -280,7 +323,7 @@ const CallRoom: React.FC = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [micEnabled, computeRisk]);
+  }, [micEnabled, computeRisk, deepfakeOpen]);
 
   return (
     <main className="min-h-screen container py-8">
@@ -658,6 +701,34 @@ const CallRoom: React.FC = () => {
             >
               Report and End
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+<AlertDialog open={deepfakeOpen} onOpenChange={(open) => {
+        setDeepfakeOpen(open);
+        if (!open) {
+          setDeepfakeName(null);
+          setDeepfakeProgress(0);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deepfake Detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deepfakeName ? `Identified as ${deepfakeName}.` : "Identifying deepfake... Press T (Donald Trump), E (Elon Musk), U (Unknown)."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-2">
+            <Progress value={deepfakeProgress} />
+            <div className="text-xs text-muted-foreground mt-2">
+              {deepfakeName ? "Identification complete." : "Analyzing voice and video fingerprints..."}
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setDeepfakeOpen(false); setDeepfakeName(null); setDeepfakeProgress(0); }}>
+              Close
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

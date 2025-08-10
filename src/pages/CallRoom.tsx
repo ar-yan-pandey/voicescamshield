@@ -461,38 +461,40 @@ const CallRoom: React.FC = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowScamAlert(false)}>
-              Continue call
-            </AlertDialogCancel>
-            <Button
-              onClick={() => {
-                try { agent.start(); toast({ title: "Distracting agent started" }); } catch {}
-                setShowScamAlert(false);
-              }}
-            >
-              Start Distracting Agent
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowScamAlert(false);
-                try { agent.stop(); } catch {}
-                end();
-                toast({ title: "Call ended" });
-              }}
-            >
-              End call
-            </Button>
-            <AlertDialogAction
-              onClick={() => {
-                setShowScamAlert(false);
-                try { agent.stop(); } catch {}
-                end();
-                toast({ title: "Reported as scam", description: "Thanks for letting us know." });
-              }}
-            >
-              End & Report
-            </AlertDialogAction>
+            <div className="w-full flex flex-wrap justify-center gap-2">
+              <AlertDialogCancel onClick={() => setShowScamAlert(false)}>
+                Continue call
+              </AlertDialogCancel>
+              <Button
+                onClick={() => {
+                  try { agent.start(); toast({ title: "Distracting agent started" }); } catch {}
+                  setShowScamAlert(false);
+                }}
+              >
+                Start Distracting Agent
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowScamAlert(false);
+                  try { agent.stop(); } catch {}
+                  end();
+                  toast({ title: "Call ended" });
+                }}
+              >
+                End call
+              </Button>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowScamAlert(false);
+                  try { agent.stop(); } catch {}
+                  end();
+                  toast({ title: "Reported as scam", description: "Thanks for letting us know." });
+                }}
+              >
+                End & Report
+              </AlertDialogAction>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

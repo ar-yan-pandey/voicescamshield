@@ -241,6 +241,25 @@ const CallRoom: React.FC = () => {
     check();
   }, [btDialogOpen]);
 
+  // Keyboard shortcuts: O = sensitive popup, X = scam popup
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable;
+      if (isTyping) return;
+      if (e.key.toLowerCase() === 'o') {
+        if (micEnabled) toggleMic();
+        setSensitiveAlertOpen(true);
+        sensitiveAlertShownRef.current = true;
+      } else if (e.key.toLowerCase() === 'x') {
+        setShowScamAlert(true);
+        alertShownRef.current = true;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [micEnabled]);
+
   return (
     <main className="min-h-screen container py-8">
       <h1 className="text-3xl font-semibold tracking-tight">Call Room</h1>

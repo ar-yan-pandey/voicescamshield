@@ -1,0 +1,5 @@
+Preview placeholder for Chrome overlay extension package. The preview build will be available soon.
+
+What you can do now:
+- Use the web app today.
+- This placeholder confirms your download flow works.

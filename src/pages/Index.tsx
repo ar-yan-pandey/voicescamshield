@@ -22,6 +22,9 @@ const Index = () => {
           <a href="/community" className="inline-flex">
             <Button variant="secondary">Community List</Button>
           </a>
+          <a href="/download-app" className="inline-flex" aria-label="Download Scam Shield overlay app">
+            <Button variant="outline">Download App</Button>
+          </a>
         </div>
       </section>
     </main>

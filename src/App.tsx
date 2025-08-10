@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import CallRoom from "./pages/CallRoom";
 import Community from "./pages/Community";
+import DownloadApp from "./pages/DownloadApp";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/call/:id" element={<CallRoom />} />
           <Route path="/community" element={<Community />} />
+          <Route path="/download-app" element={<DownloadApp />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

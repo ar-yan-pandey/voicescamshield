@@ -1,0 +1,5 @@
+Preview placeholder for macOS package. The overlay app preview build will be available soon.
+
+What you can do now:
+- Join the project and follow updates.
+- This placeholder confirms your download flow works.

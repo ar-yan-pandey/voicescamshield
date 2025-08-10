@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import JSZip from "jszip";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,124 @@ const DownloadApp = () => {
     const id = Date.now().toString(36);
     navigate(`/call/${id}`);
   };
+
+  const buildChromeExtensionZip = async () => {
+    const zip = new JSZip();
+
+    const manifest = {
+      manifest_version: 3,
+      name: "Voice Scam Shield",
+      version: "0.1.0",
+      description: "Transcribe meetings and display a scam risk meter.",
+      permissions: ["storage"],
+      host_permissions: ["https://meet.google.com/*", "https://*.zoom.us/*"],
+      content_scripts: [
+        {
+          matches: ["https://meet.google.com/*", "https://*.zoom.us/*"],
+          js: ["content.js"],
+          css: ["style.css"],
+          run_at: "document_idle",
+        },
+      ],
+      icons: {
+        "128": "icons/icon128.png",
+      },
+    } as const;
+
+    const contentJs = `(() => {
+  if ((window as any).__vss_injected) return; (window as any).__vss_injected = true;
+  const root = document.createElement('div');
+  root.id = 'vss-overlay-root';
+  root.innerHTML = '<div class="vss-card">\
+<div class="vss-h">Voice Scam Shield<button id="vss-close" title="Close" class="vss-btn" style="flex:0 0 auto;padding:4px 8px;margin-left:8px">×</button></div>\
+<div class="vss-status" id="vss-status">Idle</div>\
+<div class="vss-meter"><div class="vss-meter-bar" id="vss-meter"></div></div>\
+<div class="vss-controls"><button class="vss-btn" id="vss-toggle">Start Transcribing</button></div>\
+<div class="vss-body" id="vss-log"></div>\
+</div>';
+  document.body.appendChild(root);
+
+  const meter = root.querySelector('#vss-meter') as HTMLDivElement;
+  const statusEl = root.querySelector('#vss-status') as HTMLDivElement;
+  const btn = root.querySelector('#vss-toggle') as HTMLButtonElement;
+  const closeBtn = root.querySelector('#vss-close') as HTMLButtonElement;
+  const log = root.querySelector('#vss-log') as HTMLDivElement;
+
+  closeBtn?.addEventListener('click', () => root.remove());
+
+  let recog: any = null; let active = false; let score = 0;
+  const keywords = [
+    'gift card','wire transfer','crypto','bitcoin','apple card','google play','bank account','password','verification code',
+    'remote desktop','anydesk','teamviewer','refund','overcharge','ssn','social security','urgent','immediate action','do not tell','confidential','law enforcement','warrant','arrest'
+  ];
+
+  function riskEval(text: string){
+    let s = 0; const t = text.toLowerCase();
+    for (const k of keywords) { if (t.includes(k)) s += 8; }
+    if (/\b(otp|one[- ]time code)\b/i.test(text)) s += 10;
+    return Math.min(100, s);
+  }
+
+  function updateMeter(val: number){
+    meter.style.width = val + '%';
+    meter.setAttribute('aria-valuenow', String(val));
+    meter.style.background = val < 40 ? '#16a34a' : (val < 70 ? '#f59e0b' : '#ef4444');
+  }
+
+  function stop(){
+    active = false; if (recog) { try { recog.stop(); } catch {} }
+    btn.textContent = 'Start Transcribing';
+    statusEl.textContent = 'Idle';
+  }
+
+  function start(){
+    const w: any = window as any;
+    if (!("webkitSpeechRecognition" in w)) { statusEl.textContent = 'Speech recognition not supported in this browser.'; return; }
+    score = 0; updateMeter(0); active = true; btn.textContent = 'Stop'; statusEl.textContent = 'Listening...';
+    recog = new w.webkitSpeechRecognition();
+    recog.continuous = true; recog.interimResults = true; recog.lang = 'en-US';
+
+    recog.onresult = (e: any) => {
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i]; const txt = r[0].transcript;
+        if (r.isFinal) { final += txt + ' '; }
+      }
+      if (final) {
+        const p = document.createElement('p'); p.textContent = final; p.style.margin = '6px 0'; p.style.color = '#e5e7eb';
+        log.appendChild(p); log.scrollTop = log.scrollHeight;
+        const v = riskEval(final); score = Math.min(100, score + v / 4);
+        updateMeter(Math.round(score));
+      }
+    };
+    recog.onerror = (ev: any) => { statusEl.textContent = 'Error: ' + ev.error; };
+    recog.onend = () => { if (active) { try { recog.start(); } catch {} } else { statusEl.textContent = 'Stopped'; } };
+    try { recog.start(); } catch (err) { statusEl.textContent = 'Cannot start: ' + err; }
+  }
+
+  btn.addEventListener('click', () => { if (active) { stop(); } else { start(); } });
+})();`;
+
+    const styleCss = `#vss-overlay-root{position:fixed;top:16px;right:16px;z-index:2147483647;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif} .vss-card{background:#0f172aeb;color:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);width:320px;max-width:90vw;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;font-weight:600;font-size:14px;background:linear-gradient(135deg,#111827,#0b1220)} .vss-meter{height:10px;background:#111827;border-radius:999px;margin:8px 12px;overflow:hidden;border:1px solid rgba(255,255,255,.1)} .vss-meter-bar{height:100%;width:0%;transition:width .3s ease,background .3s ease} .vss-controls{display:flex;gap:8px;padding:8px 12px} .vss-btn{flex:1;border:0;border-radius:8px;padding:8px 10px;background:#1f2937;color:#e5e7eb;cursor:pointer;font-weight:600} .vss-btn:hover{background:#374151} .vss-body{padding:0 12px 12px 12px;max-height:200px;overflow:auto;background:#0b1220} .vss-status{padding:8px 12px;color:#cbd5e1;font-size:12px}`;
+
+    const icon128 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAsSAAALEgHS3X78AAABFUlEQVR4nO3QMQEAAAjDMO5fNPoYkQF1Z0gQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgHkTz2AAASw0JcQAAAABJRU5ErkJggg==";
+
+    zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+    zip.file("content.js", contentJs);
+    zip.file("style.css", styleCss);
+    zip.folder("icons")?.file("icon128.png", icon128, { base64: true });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "voice-scam-shield-extension.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     const title = "Download Voice Scam Shield Overlay";
     const description = "Download the Voice Scam Shield overlay app to transcribe calls in real time and detect scams.";
@@ -79,10 +198,9 @@ const DownloadApp = () => {
           <a href="/downloads/overlay-android.txt" download className="inline-flex" aria-label="Download Android preview package">
             <Button variant="secondary">Download for Android</Button>
           </a>
-          <a href="/downloads/overlay-chrome.txt" className="inline-flex" aria-label="Get Chrome Extension preview">
-            <Button variant="outline">Get Chrome Extension
+          <Button variant="outline" onClick={buildChromeExtensionZip} aria-label="Download Chrome Extension as ZIP">
+            Download Chrome Extension (.zip)
           </Button>
-          </a>
         </div>
       </section>
 
